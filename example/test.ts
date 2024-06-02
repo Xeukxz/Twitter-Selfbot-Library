@@ -1,13 +1,15 @@
-import { Client } from "./src";
-import { Timeline } from "./src/Timelines/BaseTimeline";
+import { Client } from "../src";
+import { Timeline } from "../src/Timelines/BaseTimeline";
 import { TweetStorageManager } from "./tweetStorageManager";
 import fs from 'fs'
 
-let client = new Client({
-  headless: "new",
-  keepPageOpen: false
+const client = new Client({
+  headless: true,
+  keepPageOpen: false,
+  debug: true
 })
 const database = new TweetStorageManager({
+  client,
   storeCache: true
 })
 
@@ -23,7 +25,7 @@ client.on('ready', () => {
   // create list timeline instance of list id 1646820147812790273
   client.timelines.new({
     type: 'list',
-    id: '1646820147812790273'
+    id: '1239948255787732993'
   })
 
 })
@@ -31,8 +33,8 @@ client.on('ready', () => {
 client.on('timelineCreate', async (timeline: Timeline) => {
   console.log('Timeline Created:', timeline.type)
   // console.log(timeline.tweets)
-  console.log(timeline.tweets.tweets.length, 'tweets cached')
-  database.addTweets(timeline.tweets.tweets)
+  console.log(timeline.tweets.cache.length, 'tweets cached')
+  database.addTweets(timeline.tweets.cache)
   manageTimeline(timeline)
   // console.log(timeline)
 })
@@ -59,9 +61,9 @@ async function catchUp(timeline: Timeline, extra?:{immediate: boolean}): Promise
       console.log('Scrolling timeline to collect later tweets...')
       await timeline.scroll().then(async (data) => {
 
-        console.log(timeline.tweets.tweets.length, 'tweets cached')
+        console.log(timeline.tweets.cache.length, 'tweets cached')
         
-        let storedTweets = await database.addTweets(timeline.tweets.tweets)
+        let storedTweets = await database.addTweets(timeline.tweets.cache)
         
         // console.log(storedTweets.length)
         if(storedTweets.length == 0) {
@@ -69,7 +71,7 @@ async function catchUp(timeline: Timeline, extra?:{immediate: boolean}): Promise
           return resolve(true)
         }
 
-        fs.writeFileSync('./debug.json', JSON.stringify(timeline.tweets.tweets.filter((v,i) => i > timeline.tweets.tweets.length - storedTweets.length), null, 2))
+        if(client.debug) fs.writeFileSync(`${__dirname}/../debug/debug.json`, JSON.stringify(timeline.tweets.cache.filter((v,i) => i > timeline.tweets.cache.length - storedTweets.length), null, 2))
         // console.log(data)
         resolve(await catchUp(timeline))
       })
@@ -85,10 +87,10 @@ async function streamTweets(timeline: Timeline) {
   setTimeout(async () => {
     console.log('Fetching latest...', timeline.type)
     await timeline.fetchLatest().then(async (data) => {
-      console.log(timeline.tweets.tweets.length, 'tweets cached')
+      console.log(timeline.tweets.cache.length, 'tweets cached')
       
-      let storedTweets = await database.addTweets(timeline.tweets.tweets)
-      fs.writeFileSync('./debug.json', JSON.stringify(timeline.tweets.tweets.filter((v,i) => i > timeline.tweets.tweets.length - storedTweets.length), null, 2))
+      let storedTweets = await database.addTweets(timeline.tweets.cache)
+      if(client.debug) fs.writeFileSync(`${__dirname}/../debug/debug.json`, JSON.stringify(timeline.tweets.cache.filter((v,i) => i > timeline.tweets.cache.length - storedTweets.length), null, 2))
       // console.log(data)
       streamTweets(timeline)
     })

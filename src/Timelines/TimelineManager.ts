@@ -1,7 +1,7 @@
 import { Client } from "../Client";
 import { BaseTimeline, Timeline, TimelineData } from "./BaseTimeline";
 import { HomeTimeline } from "./HomeTimeline";
-import { ListTimeline } from "./ListTImeline";
+import { ListTimeline } from "./ListTimeline";
 
 // Timeline rules:
 // - There cant be any duplicate timelines, 1 home, 1 following, multiple lists but only one of each id

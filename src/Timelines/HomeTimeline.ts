@@ -1,6 +1,7 @@
 import { RawTweetData } from "../Tweet";
 import { Client } from "../Client";
 import { BaseTimeline, TimelineEntryData } from "./BaseTimeline";
+import fs from 'fs';
 
 export class HomeTimeline extends BaseTimeline {
   variables: HomeTimelineUrlData["variables"];
@@ -98,6 +99,7 @@ export class HomeTimeline extends BaseTimeline {
   buildTweetsFromCache(data: RawHomeTimelineData) {
     return new Promise((resolve, reject) => {
       // console.log(data.data.list.tweets_timeline)
+      if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-home.json`, JSON.stringify(data, null, 2));
       let t = this.tweets.addTweets(
         data.data.home.home_timeline_urt.instructions[0]
           .entries as RawTweetData[]

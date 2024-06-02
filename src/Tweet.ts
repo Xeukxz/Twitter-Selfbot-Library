@@ -11,11 +11,25 @@ export class Tweet {
     url: string;
   }[];
   text?: string;
+  unavailable: boolean = false;
   raw: RawTweetData;
 
   constructor(data: RawTweetData) {
     try {
-      let tweetResults = data.content.itemContent.tweet_results.result.tweet || data.content.itemContent.tweet_results.result;
+      let tweetResults = data.content.itemContent.tweet_results.result?.tweet || data.content.itemContent.tweet_results.result;
+      if (!tweetResults) {
+        this.unavailable = true;
+        this.raw = data;
+        this.id = data.entryId;
+        this.user = {
+          id: '',
+          name: '',
+          username: '',
+          profilePictureUrl: ''
+        };
+        return;
+      }
+        
       let userData = (tweetResults as any).tweet?.core.user_results || tweetResults.core.user_results;
       this.raw = data;
       this.id = tweetResults.rest_id;
@@ -34,6 +48,7 @@ export class Tweet {
         });
       }
       this.text = tweetResults.legacy.full_text;
+      
     } catch (e) {
       console.log(JSON.stringify(data, null, 2))
       throw new Error(`${e}`)

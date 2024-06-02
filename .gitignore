@@ -1,2 +1,4 @@
 accountData.json
-tweetData.csv
+example/tweetData.csv
+node_modules
+debug

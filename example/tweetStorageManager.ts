@@ -1,15 +1,25 @@
 import fs from 'fs'
-import { Tweet } from './src/Tweet'
+import { Tweet } from '../src/Tweet'
+import { Client } from '../src/Client';
 
 export class TweetStorageManager {
   cache: StorageCache[][] = [[],[]] // [0] = cache, [1] = new tweets
   cacheWritten = false
+  client: Client
 
   constructor({
-    storeCache = true // put this here before i knew how i was going to implement it, huilen dus
+    client,
+    storeCache = true
   }: {
+    client: Client
     storeCache: boolean
   }) {
+    this.client = client
+    // ensure storage file exists
+    if (!fs.existsSync(`${__dirname}/tweetData.csv`)) {
+      fs.writeFileSync(`${__dirname}/tweetData.csv`, '')
+      console.log('Storage file created.')
+    }
     if (storeCache) {
       this.writeCache(this.readStorage())
       console.log('Cache loaded. Storage Ready.')
@@ -17,7 +27,7 @@ export class TweetStorageManager {
   }
 
   readStorage() {
-    return fs.readFileSync('./tweetData.csv', 'utf-8')
+    return fs.readFileSync(`${__dirname}/tweetData.csv`, 'utf-8')
   }
 
   writeStorage(data: StorageCache[]) {
@@ -25,7 +35,7 @@ export class TweetStorageManager {
     data.forEach((tweet) => {
       csv += `"${tweet.username}","${tweet.userID}","${tweet.tweetID}","${tweet.text}","[${tweet.media.join(', ')}]"\n`
     })
-    fs.appendFileSync('./tweetData.csv', csv)
+    fs.appendFileSync(`${__dirname}/tweetData.csv`, csv)
     this.margeCache()
   }
 
@@ -50,7 +60,7 @@ export class TweetStorageManager {
       })
     })
     this.cacheWritten = true
-    fs.writeFileSync('./debug.json', JSON.stringify(this.cache, null, 2))
+    if(this.client.debug) fs.writeFileSync(`${__dirname}/../debug/debug.json`, JSON.stringify(this.cache, null, 2))
   }
 
 

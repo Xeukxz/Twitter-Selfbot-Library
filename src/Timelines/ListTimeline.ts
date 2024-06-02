@@ -1,6 +1,7 @@
 import { RawTweetData } from "../Tweet";
 import { Client } from "../Client";
 import { BaseTimeline, Cursor, TimelineEntryData } from "./BaseTimeline";
+import fs from 'fs';
 
 export class ListTimeline extends BaseTimeline {
 
@@ -94,6 +95,7 @@ export class ListTimeline extends BaseTimeline {
   buildTweetsFromCache(data: RawListTimelineData) {
     return new Promise((resolve, reject) => {
       // console.log(data.data.list.tweets_timeline)
+      if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-list.json`, JSON.stringify(data, null, 2))
       let t = this.tweets.addTweets(data.data.list.tweets_timeline.timeline.instructions[0].entries as RawTweetData[])
       // console.log(t)
       resolve(t)

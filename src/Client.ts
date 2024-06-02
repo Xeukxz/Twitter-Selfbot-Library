@@ -1,20 +1,29 @@
-import EventEmitter from "events";
+import EventEmitter from "node:events";
 import { TimelineManager } from "./Timelines/TimelineManager";
 import { RESTApiManager } from "./REST/rest";
 import puppeteer from "puppeteer";
 import fs from "fs";
+import { Timeline } from "./Timelines";
 
 export interface ClientParams {
-  headless?: boolean | "new";
+  headless: boolean;
   keepPageOpen?: boolean;
+  debug?: boolean;
 }
 
-export class Client extends EventEmitter {
+export interface ClientEvents {
+  ready: void;
+  timelineCreate: Timeline;
+}
+
+
+export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
   timelines: TimelineManager = new TimelineManager(this)
   token!: string
   csrfToken!: string
   cookies!: string
   rest!: RESTApiManager
+  debug: boolean // writes multiple debug files, not recommended for production
   
   /**
    * Create a new client
@@ -23,10 +32,12 @@ export class Client extends EventEmitter {
    * 
    */
   constructor({
-    headless = "new",
+    headless = true,
     keepPageOpen = false,
+    debug = false,
   }: ClientParams) {
     super();
+    this.debug = debug; // ! DEVELOPMENT ONLY
     this.getAccountData({
       headless,
       keepPageOpen,
@@ -37,6 +48,7 @@ export class Client extends EventEmitter {
     })
   }
 
+  // no idea what this was supposed to do 💀
   async build() {
 
   }
@@ -46,23 +58,43 @@ export class Client extends EventEmitter {
     keepPageOpen,
   }: ClientParams) {
     return new Promise<void>(async (resolve, reject) => {
-      // Launch the browser and open a new blank page
-      const browser = await puppeteer.launch({
-        headless: headless,
-      });
 
-      browser.on('disconnected', () => {
-        console.log('Browser disconnected, but program continues running...');
-        // Here you can handle the disconnection, for example by launching a new browser
-        // browser = await puppeteer.launch();
-      });
-      
-      const page = await browser.newPage();
+      if(this.debug) {
+        // ensure debug folder exists
+        if (!fs.existsSync(`${__dirname}\\..\\debug`)) {
+          fs.mkdirSync(`${__dirname}\\..\\debug`);
+          console.log("Debug folder created.");
+        }
+      }
+
+      // ensure storage file exists
+      if (!fs.existsSync(`${__dirname}\\..\\accountData.json`)) {
+        fs.writeFileSync(`${__dirname}\\..\\accountData.json`, "{}");
+        console.log("Account data file created.");
+      }
       let storedData = JSON.parse(
         fs.readFileSync(`${__dirname}\\..\\accountData.json`, "utf-8")
       );
+
+      // Launch the browser and open a new blank page
+      console.log(headless ? "Running in headless mode." : "Running in non-headless mode.")
+      console.log(keepPageOpen ? "Keeping browser open after getting account data." : "Closing browser after getting account data.")
+      const browser = await puppeteer.launch({
+        headless: Object.keys(storedData?.cookies ?? storedData)?.length > 0 ? headless : false,
+      });
+
+      browser.on('disconnected', async () => {
+        if(storedData?.cookies) console.log('Browser has been disconnected, The client will continue running.');
+        else {
+          console.log('Browser has been disconnected, Account information has not been gathered. Exiting...');
+          await browser.close();
+          process.exit(1);
+        }
+      });
+      
+      const page = await browser.newPage();
       // if stored data is an empty object
-      if (Object.keys(storedData?.cookies)?.length > 0)
+      if (Object.keys(storedData?.cookies ?? storedData)?.length > 0)
         await page.setCookie(...storedData.cookies);
       else {
         await page.setViewport({ width: 1080, height: 1024 });
@@ -95,14 +127,15 @@ export class Client extends EventEmitter {
           let cookiesString = cookies
             .map((cookie) => `${cookie.name}=${cookie.value}`)
             .join("; ");
+          storedData = {
+            Authorisation: token,
+            "x-csrf-token": csrftoken,
+            cookies: cookies,
+            cookiesString: cookiesString,
+          };
           fs.writeFileSync(
             `${__dirname}\\..\\accountData.json`,
-            JSON.stringify({
-              Authorisation: token,
-              "x-csrf-token": csrftoken,
-              cookies: cookies,
-              cookiesString: cookiesString,
-            }, null, 2)
+            JSON.stringify(storedData, null, 2)
           );
           // fs.writeFileSync('cookies.json', JSON.stringify(cookies))
           // console.log(cookies, cookiesString);

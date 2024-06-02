@@ -1,7 +1,7 @@
 import { RawTweetData, Tweet } from "./Tweet";
 
 export class TweetManager {
-  tweets: Tweet[] = [];
+  cache: Tweet[] = [];
 
   constructor() {
 
@@ -13,17 +13,20 @@ export class TweetManager {
    * @param id Tweet ID
    */
   fetch(id: string) {
-    let tweet = this.tweets.find((tweet) => tweet.id === id);
+    let tweet = this.cache.find((tweet) => tweet.id === id);
     if (tweet) return tweet;
     else return null; // TODO: Fetch tweet from API
   }
 
   addTweets(tweets: RawTweetData[]) {
-    this.tweets = this.tweets.concat(tweets.map((tweet) => {
-      if(tweet.entryId.startsWith('cursor-') || tweet.entryId.startsWith('sq-cursor-') || tweet.entryId.startsWith('list-conversation') || tweet.entryId.startsWith('home-conversation')) return null as any;
+    this.cache = this.cache.concat(tweets.map((tweet) => {
+      if(!tweet.entryId.startsWith('tweet-')){
+        console.log(`skipping "${tweet.entryId}"`)
+        return null as any;
+      } 
       return new Tweet(tweet);
-    })).filter((tweet) => tweet !== null);
-    return this.tweets;
+    })).filter((tweet) => tweet !== null).filter((tweet) => !tweet.unavailable);
+    return this.cache;
   }
 
 }
