@@ -1,13 +1,14 @@
 import { Client } from "../Client";
-import { BaseTimeline, Timeline, TimelineData } from "./BaseTimeline";
+import { BaseTimeline, Timeline } from "./BaseTimeline";
+import { FollowingTimeline } from "./FollowingTimeline";
 import { HomeTimeline } from "./HomeTimeline";
-import { ListTimeline } from "./ListTimeline";
+import { ListTimeline, ListTimelineUrlData } from "./ListTimeline";
 
 // Timeline rules:
 // - There cant be any duplicate timelines, 1 home, 1 following, multiple lists but only one of each id
 export class TimelineManager {
   client: Client
-  timelines: Timeline[] = [];
+  cache: Timeline[] = [];
   constructor(client: Client) {
     this.client = client
   }
@@ -23,26 +24,28 @@ export class TimelineManager {
         timeline = new HomeTimeline(this.client)
         break;
       case 'following':
+        timeline = new FollowingTimeline(this.client)
         break;
       case 'list':
         timeline = new ListTimeline(this.client, {
           id: data.id
         })
-        
         break;
     }
     if(!timeline) /* return console.log('no timeline') */ throw new Error(`Timeline was not defined. ${data.type}`)
-    this.timelines.push(timeline)
+    this.cache.push(timeline)
   }
 
-  fetch(data: TimelineFetchData) {
+  fetch(data: TimelineFetchData): Timeline | undefined {
     switch (data.type) {
       case 'home':
+        return this.cache.find(timeline => timeline instanceof HomeTimeline)
         break;
       case 'following':
+        return this.cache.find(timeline => timeline instanceof FollowingTimeline)
         break;
       case 'list':
-        this.timelines.find(timeline => timeline.listdata?.variables.id === data.id)
+        return this.cache.find(timeline => timeline instanceof ListTimeline && timeline.variables.listId === data.id)
         break;
     }
   }

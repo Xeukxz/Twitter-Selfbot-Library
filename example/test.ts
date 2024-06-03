@@ -1,12 +1,10 @@
-import { Client } from "../src";
-import { Timeline } from "../src/Timelines/BaseTimeline";
+import { Client, Timeline } from "../src";
 import { TweetStorageManager } from "./tweetStorageManager";
 import fs from 'fs'
 
 const client = new Client({
   headless: true,
-  keepPageOpen: false,
-  debug: true
+  keepPageOpen: false
 })
 const database = new TweetStorageManager({
   client,
@@ -20,6 +18,11 @@ client.on('ready', () => {
   // create home timeline instance
   client.timelines.new({
     type: 'home'
+  })
+
+  // create following timeline instance
+  client.timelines.new({
+    type: 'following'
   })
   
   // create list timeline instance of list id 1646820147812790273
