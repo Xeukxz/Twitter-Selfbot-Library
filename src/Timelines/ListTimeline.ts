@@ -1,57 +1,62 @@
-import { RawTweetData } from "../Tweet";
+import { RawTweetData, Tweet } from "../Tweet";
 import { Client } from "../Client";
-import { BaseTimeline, BaseTimelineUrlData, Cursor, TimelineEntryData } from "./BaseTimeline";
+import { BaseTimeline, BaseTimelineUrlData, BottomCursorData, Cursor, TimelineTweetEntryData, TopCursorData } from "./BaseTimeline";
 import fs from 'fs';
+import { Queries } from "../Routes";
+import { TweetManager } from "../Managers";
 
-export class ListTimeline extends BaseTimeline {
+export interface ListTimelineData {
+  id: string
+  count?: number
+}
+
+
+export class ListTimeline extends BaseTimeline<RawTweetData> {
   // variables: ListTimelineUrlData['variables']
   // features: ListTimelineUrlData['features']
-  cache: RawListTimelineData[] = []
+  cache: RawListTimelineResponseData[] = []
+  // listData: {
+  //   id: string
+  //   name: string
+  //   description: string
+  // }
   id: string
-  constructor(client: Client, data: {
-    id: string
-    count?: number
-  }) {
-    super(client)
-    this.type = 'list'
+
+  variables: ListTimelineUrlData['variables'] = {
+    listId: undefined as any,
+    ...super._variables
+  }
+  constructor(client: Client, data: ListTimelineData) {
+    super(client, "list")
     this.id = data.id
-
-
-    this.fetch()
-
-    console.log(this.cache)
-
-    
+    this.variables.listId = data.id
   }
 
   get url() {
     return `https://twitter.com/i/api/graphql/F9aW7tjdTWE9m5qHqzEpUA/ListLatestTweetsTimeline?${this.urlDataString}`
   }
 
-  get variables(): ListTimelineUrlData['variables'] {
-    return {
-      listId: this.id,
-      ...super.variables
-    }
-  }
-
-  get features(): ListTimelineUrlData['features'] {
-    return {
-      ...super.features
-    }
-  }
+  // get features(): ListTimelineUrlData['features'] {
+  //   return {
+  //     ...super.features
+  //   }
+  // }
 
   /**
    * Fetches the latest tweets from the timeline
    * @returns RawListTimelineData[]
    */
   async fetchLatest() {
-    let entries = this.cache[this.cache.length - 1].data.list.tweets_timeline.timeline.instructions[0].entries
-    this.variables.cursor = this.cursors.top = (entries[entries.length - 2].content as any).value // cursor-top-\d{19} 
-    this.variables.count = 40
-    await this.fetch()
-    this.resetData()
-    return this.cache[this.cache.length - 1]
+    this.variables.cursor = this.cursors.top;
+    this.variables.count = 40;
+    let { tweets, rawData } = await this.fetch();
+    let entries = ((rawData as RawListTimelineResponseData).data.list.tweets_timeline.timeline.instructions[0].entries as TimelineTweetEntryData);
+    this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
+    this.resetData();
+    return {
+      tweets,
+      rawData: this.cache[this.cache.length - 1]
+    };
   }
 
   /**
@@ -59,22 +64,20 @@ export class ListTimeline extends BaseTimeline {
    * @returns RawListTimelineData[]
    */
   async scroll() {
-    let entries = this.cache[this.cache.length - 1].data.list.tweets_timeline.timeline.instructions[0].entries
-    this.variables.cursor = this.cursors.bottom = (entries[entries.length - 1].content as any).value // cursor-bottom-\d{19}
-    this.variables.count = 40
-    await this.fetch()
-    this.resetData()
-    return this.cache[this.cache.length - 1]
+    this.variables.cursor = this.cursors.bottom;
+    this.variables.count = 40;
+    let { tweets, rawData } = await this.fetch();
+    let entries = ((rawData as RawListTimelineResponseData).data.list.tweets_timeline.timeline.instructions[0].entries as TimelineTweetEntryData);
+    this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
+    this.resetData();
+    return {
+      tweets,
+      rawData: this.cache[this.cache.length - 1]
+    };
   }
 
-  resetData() {
-    if(this.variables.cursor) delete this.variables.cursor
-    this.variables.count = 20
-    
-  }
-
-  buildTweetsFromCache(data: RawListTimelineData) {
-    return new Promise((resolve, reject) => {
+  buildTweetsFromCache(data: RawListTimelineResponseData) {
+    return new Promise<Tweet<RawTweetData>[]>((resolve, reject) => {
       // console.log(data.data.list.tweets_timeline)
       if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-list.json`, JSON.stringify(data, null, 2))
       let t = this.tweets.addTweets(data.data.list.tweets_timeline.timeline.instructions[0].entries as RawTweetData[])
@@ -82,16 +85,6 @@ export class ListTimeline extends BaseTimeline {
       resolve(t)
     })
   }
-
-  protected patch(data: RawListTimelineData) {
-    return new Promise((resolve, reject) => {
-      let entries = data.data.list.tweets_timeline.timeline.instructions[0].entries
-      this.cursors.top = ((entries[entries.length - 2] as unknown as Cursor).content as any).value // cursor-top-\d{19} 
-      this.cursors.bottom = ((entries[entries.length - 1] as unknown as Cursor).content as any).value // cursor-bottom-\d{19}
-      resolve(data)
-    })
-  }
-
 }
 
 export interface ListTimelineUrlData extends BaseTimelineUrlData {
@@ -101,15 +94,15 @@ export interface ListTimelineUrlData extends BaseTimelineUrlData {
   features: BaseTimelineUrlData["features"]
 }
 
-export interface RawListTimelineData {
+export interface RawListTimelineResponseData {
   data: {
     list: {
       tweets_timeline: {
         timeline: {
           id: string
           instructions: [{
-            type: string
-            entries: TimelineEntryData
+            type: "TimelineAddEntries";
+            entries: TimelineTweetEntryData;
           }]
           metadata: {
             scribeConfig: {

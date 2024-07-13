@@ -1,9 +1,12 @@
 import EventEmitter from "node:events";
-import { TimelineManager } from "./Timelines/TimelineManager";
+import { TimelineManager } from "./Managers/TimelineManager";
 import { RESTApiManager } from "./REST/rest";
 import puppeteer from "puppeteer";
 import fs from "fs";
 import { Timeline } from "./Timelines";
+import { ProfileManager } from "./Managers/ProfileManager";
+import { config } from "node:process";
+import { Profile } from "./Profile";
 
 export interface ClientParams {
   headless: boolean;
@@ -14,17 +17,30 @@ export interface ClientParams {
 export interface ClientEvents {
   ready: void;
   timelineCreate: Timeline;
+  profileCreate: Profile;
 }
 
 
 export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
-  timelines: TimelineManager = new TimelineManager(this)
   token!: string
   csrfToken!: string
   cookies!: string
   rest!: RESTApiManager
+  timelines: TimelineManager = new TimelineManager(this)
+  profiles: ProfileManager = new ProfileManager(this)
   debug: boolean // writes multiple debug files, not recommended for production
-  
+  features!: {
+    config: {
+      [key: string]: {
+        value: boolean | string | number | any[]
+      }
+    },
+    impression_pointers: {},
+    impressions: {},
+    keysRead: {},
+    settingsVersion: string,
+    get: <T extends string[]>(keys: string[]) => FeaturesGetData<T>
+  }
   /**
    * Create a new client
    * @param headless Whether or not to run the browser in headless mode
@@ -101,10 +117,24 @@ export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
         console.log("Please login to the account you wish to automate.");
       }
 
-      // if(storedCookies && storedCookies.length > 0)
 
       // Navigate the page to a URL
       await page.goto("https://twitter.com/home");
+
+      const html = await page.content();
+      
+      let featuresString = `${html.match(/"user":\{"config".+?,"debug"/)![0].replace(`,"debug"`, "").replace(`"user":`, "")}`
+      this.features = {
+        ...JSON.parse(featuresString),
+        get: <T extends string[]>(keys: string[]): FeaturesGetData<T> => { //  jesus fucking christ
+          return {
+            ...Object.fromEntries(keys.map(key => [key, this.features.config[key].value])),
+            URIEncoded: function() {
+              return encodeURIComponent(JSON.stringify(this))
+            }
+          } as FeaturesGetData<T>;
+        }
+      }
 
       // Set screen size
       if (!headless) await page.setViewport({ width: 1080, height: 1024 });
@@ -155,3 +185,7 @@ export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
     });
   }
 }
+
+export type FeaturesGetData<T extends string[]> = Record<T[number], boolean | string | number | any[]> & {
+  URIEncoded: () => string;
+};

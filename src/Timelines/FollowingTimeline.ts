@@ -1,57 +1,58 @@
-import { RawTweetData } from "../Tweet";
+import { RawTweetData, Tweet } from "../Tweet";
 import { Client } from "../Client";
-import { BaseTimeline, BaseTimelineUrlData, TimelineEntryData } from "./BaseTimeline";
+import { BaseTimeline, BaseTimelineUrlData, BottomCursorData, Cursor, TimelineAddEntries, TimelineShowAlert, TimelineTweetEntryData, TopCursorData } from "./BaseTimeline";
 import fs from 'fs';
+import { Queries } from "../Routes";
+import { TweetManager } from "../Managers";
 
-export class FollowingTimeline extends BaseTimeline {
+export interface FollowingTimelineData {
+  count?: number;
+}
+
+export class FollowingTimeline extends BaseTimeline<RawTweetData> {
   // variables: FollowingTimelineUrlData["variables"];
   // features: FollowingTimelineUrlData["features"];
-  cache: RawFollowingTimelineData[] = [];
+  cache: RawFollowingTimelineResponseData[] = [];
+  variables: FollowingTimelineUrlData["variables"] = {
+    includePromotedContent: true,
+    latestControlAvailable: true,
+    withCommunity: false,
+    ...super._variables,
+  }
   constructor(
     client: Client,
-    data?: {
-      count?: number;
-    }
+    data?: FollowingTimelineData
   ) {
-    super(client);
-    this.type = "following";
-
-    this.fetch();
-    console.log(this.cache);
+    super(client, "following");
   }
 
   get url() {
     return `https://twitter.com/i/api/graphql/9EwYy8pLBOSFlEoSP2STiQ/HomeLatestTimeline?${this.urlDataString}`;
   }
-  
-  get variables(): FollowingTimelineUrlData["variables"] {
-    return {
-      includePromotedContent: true,
-      latestControlAvailable: true,
-      withCommunity: false,
-      ...super.variables,
-    };
-  }
 
-  get features(): FollowingTimelineUrlData["features"] {
-    return {
-      ...super.features,
-    };
-  }
+  
+
+  // get features(): FollowingTimelineUrlData["features"] {
+  //   return {
+  //     ...super.features,
+  //   };
+  // }
 
   /**
    * Fetches the latest tweets from the timeline
    * @returns RawListTimelineData[]
    */
   async fetchLatest() {
-    let entries =
-      this.cache[this.cache.length - 1].data.home.home_timeline_urt
-        .instructions[0].entries;
-    this.variables.cursor = (entries[entries.length - 2].content as any).value; // cursor-top-\d{19}
+    this.variables.cursor = this.cursors.top;
     this.variables.count = 40;
-    await this.fetch();
+    let { tweets, rawData } = await this.fetch();
+    let entries = ((rawData as RawFollowingTimelineResponseData).data.home.home_timeline_urt.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
+    this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.resetData();
-    return this.cache[this.cache.length - 1];
+    return {
+      tweets,
+      rawData: this.cache[this.cache.length - 1]
+    };
   }
 
   /**
@@ -59,43 +60,29 @@ export class FollowingTimeline extends BaseTimeline {
    * @returns RawListTimelineData[]
    */
   async scroll() {
-    let entries =
-      this.cache[this.cache.length - 1].data.home.home_timeline_urt
-        .instructions[0].entries;
-    this.variables.cursor = (entries[entries.length - 1].content as any).value; // cursor-bottom-\d{19}
+    this.variables.cursor = this.cursors.bottom;
     this.variables.count = 40;
-    await this.fetch();
-    // this.resetData()
-    return this.cache[this.cache.length - 1];
+    let { tweets, rawData } = await this.fetch();
+    let entries = ((rawData as RawFollowingTimelineResponseData).data.home.home_timeline_urt.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
+    this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
+    this.resetData();
+    return {
+      tweets,
+      rawData: this.cache[this.cache.length - 1]
+    };
   }
 
-  resetData() {
-    if (this.variables.cursor) delete this.variables.cursor;
-    this.variables.count = 20;
-  }
-
-  buildTweetsFromCache(data: RawFollowingTimelineData) {
-    return new Promise((resolve, reject) => {
+  buildTweetsFromCache(data: RawFollowingTimelineResponseData) {
+    return new Promise<Tweet<RawTweetData>[]>((resolve, reject) => {
       // console.log(data.data.list.tweets_timeline)
-      if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-home.json`, JSON.stringify(data, null, 2));
+      if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-following.json`, JSON.stringify(data, null, 2));
       let t = this.tweets.addTweets(
-        data.data.home.home_timeline_urt.instructions[0]
-          .entries as RawTweetData[]
+        (data.data.home.home_timeline_urt.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries as RawTweetData[]
       );
       // console.log(t)
       resolve(t);
     });
   }
-
-  protected patch(
-    data: RawFollowingTimelineData,
-    extra?: {
-      cursor?: {
-        top?: string;
-        bottom?: string;
-      };
-    }
-  ) {}
 }
 
 /* 
@@ -136,35 +123,11 @@ export interface FollowingTimelineUrlData extends BaseTimelineUrlData {
   features: BaseTimelineUrlData["features"]
 }
 
-export interface RawFollowingTimelineData {
+export interface RawFollowingTimelineResponseData {
   data: {
     home: {
       home_timeline_urt: {
-        instructions: [
-          {
-            type: "TimelineAddEntries";
-            entries: TimelineEntryData;
-          },
-          {
-            type: "TimelineShowAlert";
-            alertType: "NewTweets";
-            triggerDelayMs: number;
-            displayDurationMs: number;
-            userResults: {
-              result: {
-                _typename: "User";
-                id: string;
-                rest_id: string;
-                affiliates_highlighted_label: any;
-                has_graduated_access: boolean;
-                is_blue_verified: boolean;
-                profile_image_shape: string;
-                legacy: any;
-                professional: any;
-              };
-            }[];
-          }
-        ];
+        instructions: [TimelineAddEntries, TimelineShowAlert];
         metadata: {
           scribeConfig: {
             page: string;

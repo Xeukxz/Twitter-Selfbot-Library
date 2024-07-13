@@ -1,6 +1,10 @@
 import { Client } from "../Client";
 import Axios, { AxiosResponse } from "axios";
 import fs from 'fs'
+import { BaseTimelineUrlData } from '../Timelines/BaseTimeline';
+import { Queries } from "../Routes";
+
+let count = 0;
 
 export class RESTApiManager {
   client: Client;
@@ -32,13 +36,16 @@ export class RESTApiManager {
     }
   }
 
-  get(url: string): Promise<AxiosResponse> {
+  get(url: string, noAuth: boolean = false): Promise<AxiosResponse> {
     return new Promise((resolve, reject) => {
       // console.log(`GET ${url}`)
+      let headers: any = this.headers;
+      if(noAuth) delete headers.Authorization;
+      // console.log(headers)
       Axios({
         method: 'get',
         url: url,
-        headers: this.headers,
+        headers: headers,
       }).then((res) => {
         resolve(res);
       }).catch((err) => {
@@ -60,6 +67,31 @@ export class RESTApiManager {
       }).catch((err) => {
         reject(err);
       })
+    });
+  }
+
+  graphQL({
+    query,
+    variables,
+    method = 'get',
+    fieldToggles
+  }: {
+    query: Queries,
+    variables: BaseTimelineUrlData['variables'],
+    method?: 'get' | 'post'
+    fieldToggles?: {
+      [key: string]: boolean
+    }
+  }): Promise<AxiosResponse> {
+    return new Promise((resolve, reject) => {
+      console.log(variables)
+      let features = this.client.features.get(query.metadata.featureSwitches);
+      this.get(`https://x.com/i/api/graphql/${query.queryId}/${query.operationName}?variables=${variables.URIEncoded()}&features=${features.URIEncoded()}${fieldToggles ? '&'+encodeURIComponent(JSON.stringify(fieldToggles)) : ''}`).then((res) => {
+        fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-${count++}.json`, JSON.stringify(res.data, null, 2));
+        resolve(res);
+      }).catch((err) => {
+        reject(err);
+      });
     });
   }
 }

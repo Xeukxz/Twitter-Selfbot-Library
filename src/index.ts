@@ -1,5 +1,5 @@
-export { Client } from './Client'
-export { Tweet } from './Tweet'
-export { TweetManager } from './TweetManager'
+export * from './Client'
+export * from './Tweet'
+export * from './Managers'
 export * from './Timelines'
 export * from './REST'

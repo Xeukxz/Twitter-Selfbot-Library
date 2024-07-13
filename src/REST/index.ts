@@ -1,1 +1,1 @@
-export { RESTApiManager } from './rest'
+export * from './rest'
