@@ -120,6 +120,12 @@ export class RepliesTimeline extends BaseTimeline<RawTweetData> {
       resolve(t);
     });
   }
+
+  setCursors(rawTimelineData: RawRepliesTimelineResponseData): void {
+    let entries = (rawTimelineData.data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
+    this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
+    this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
+  }
 }
 
 export interface RepliesTimelineUrlData {

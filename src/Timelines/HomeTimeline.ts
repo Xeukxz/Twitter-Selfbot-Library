@@ -1,6 +1,6 @@
 import { RawTweetData, Tweet, TweetTypes } from "../Tweet";
 import { Client, FeaturesGetData } from "../Client";
-import { BaseTimeline, BaseTimelineUrlData, TimelineTweetEntryData, NewTimelineData, NewHomeTimelineData, TimelineAddEntries, TimelineShowAlert, Cursor, TopCursorData, BottomCursorData } from "./BaseTimeline";
+import { BaseTimeline, BaseTimelineUrlData, TimelineTweetEntryData, NewTimelineData, NewHomeTimelineData, TimelineAddEntries, TimelineShowAlert, Cursor, TopCursorData, BottomCursorData, RawTimelineResponseData } from "./BaseTimeline";
 import fs from 'fs';
 import { Queries } from "../Routes";
 import { TweetManager } from "../Managers";
@@ -87,6 +87,13 @@ export class HomeTimeline extends BaseTimeline<RawTweetData> {
       // console.log(t)
       resolve(t);
     });
+  }
+
+  setCursors(rawTimelineData: RawHomeTimelineResponseData): void {
+    let entries = (rawTimelineData.data.home.home_timeline_urt.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
+    this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
+    this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
+  
   }
 }
 export interface HomeTimelineUrlData extends BaseTimelineUrlData {

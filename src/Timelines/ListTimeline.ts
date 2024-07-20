@@ -85,6 +85,12 @@ export class ListTimeline extends BaseTimeline<RawTweetData> {
       resolve(t)
     })
   }
+
+  setCursors(rawTimelineData: RawListTimelineResponseData): void {
+    let entries = (rawTimelineData.data.list.tweets_timeline.timeline.instructions[0].entries as TimelineTweetEntryData);
+    this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
+    this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
+  }
 }
 
 export interface ListTimelineUrlData extends BaseTimelineUrlData {

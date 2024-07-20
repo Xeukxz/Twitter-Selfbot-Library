@@ -34,7 +34,13 @@ export class TimelineManager {
       }
       if('type' in timelineData) delete timelineData.type
       existing = new Timelines[data.type](this.client, timelineData as any) // 😭
-      await existing.fetch()
+      let {
+        tweets,
+        rawData
+      } = await existing.fetch()
+
+      existing.setCursors(rawData as any)
+      
       
       this.cache.push(existing)
       console.log('created timeline')

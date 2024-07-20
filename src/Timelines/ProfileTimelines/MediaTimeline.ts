@@ -193,6 +193,12 @@ export class MediaTimeline extends BaseTimeline<RawGridTweetData> {
       }
     });
   }
+
+  setCursors(rawTimelineData: RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData): void {
+    let entries = (rawTimelineData.data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
+    this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
+    this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
+  }
 }
 
 export interface MediaTimelineUrlData {
@@ -207,7 +213,7 @@ export interface MediaTimelineUrlData {
   features: BaseTimelineUrlData["features"];
 }
 
-interface RawMediaModuleTimelineResponseData {
+export interface RawMediaModuleTimelineResponseData {
   data: {
     user: {
       result: {

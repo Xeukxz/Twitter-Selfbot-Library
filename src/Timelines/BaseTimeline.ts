@@ -7,7 +7,7 @@ import { HomeTimeline, RawHomeTimelineResponseData, HomeTimelineData } from './H
 import { FollowingTimeline, FollowingTimelineData, RawFollowingTimelineResponseData } from "./FollowingTimeline"
 import { PostsTimeline, PostsTimelineData, RawPostsTimelineResponseData } from "./ProfileTimelines/PostsTimeline"
 import { Queries } from "../Routes"
-import { MediaTimeline, MediaTimelineData, RawMediaAddToModuleTimelineResponseData } from "./ProfileTimelines/MediaTimeline"
+import { MediaTimeline, MediaTimelineData, RawMediaAddToModuleTimelineResponseData, RawMediaModuleTimelineResponseData } from "./ProfileTimelines/MediaTimeline"
 import { RepliesTimeline } from "./ProfileTimelines/RepliesTimeline"
 import { EventEmitter } from "events"
 
@@ -81,7 +81,11 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
   async refresh() {
     this.tweets = new TweetManager()
     this.cache = []
-    await this.fetch()
+    let {
+      tweets,
+      rawData
+    } = await this.fetch()
+    this.setCursors(rawData)
     return []
   }
 
@@ -89,6 +93,7 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
    * Fetch the timeline
    */
   async fetch() {
+    console.log(this.cursors)
     return new Promise<timelineTweetReturnData>((resolve, reject) => {
       this.client.rest.graphQL({
         query: this.query,
@@ -251,7 +256,9 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
     setTimeout(() => {
       this.catchUp({minCatchUpTimeout, maxCatchUpTimeout, maxLoops, isComplete, _current: _current + 1}, handleTweets, onCatchUpComplete)
     }, randomTime);
-  } 
+  }
+  
+  abstract setCursors(rawTimelineData: RawTimelineResponseData): void
 }
 
 export interface timelineTweetReturnData {
@@ -308,7 +315,7 @@ export interface BottomCursorData extends CursorData {
 
 export type Cursor = TopCursorData | BottomCursorData
 
-export type RawTimelineResponseData = RawListTimelineResponseData | RawHomeTimelineResponseData | RawFollowingTimelineResponseData | RawPostsTimelineResponseData | RawMediaAddToModuleTimelineResponseData
+export type RawTimelineResponseData = RawListTimelineResponseData | RawHomeTimelineResponseData | RawFollowingTimelineResponseData | RawPostsTimelineResponseData | RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData
 
 
 export interface NewListTimelineData {

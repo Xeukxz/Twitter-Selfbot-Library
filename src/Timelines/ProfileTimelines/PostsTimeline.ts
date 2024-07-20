@@ -61,7 +61,7 @@ export class PostsTimeline extends BaseTimeline<RawTweetData> {
    * @returns RawListTimelineData[]
    */
   async fetchLatest() {
-    this.variables.cursor = undefined;
+    this.variables.cursor = this.cursors.top;
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch();
     let entries = ((rawData as RawPostsTimelineResponseData).data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
@@ -78,7 +78,7 @@ export class PostsTimeline extends BaseTimeline<RawTweetData> {
    * @returns RawListTimelineData[]
    */
   async scroll() {
-    this.variables.cursor = this.variables.cursor;
+    this.variables.cursor = this.cursors.bottom;
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch();
     let entries = ((rawData as RawPostsTimelineResponseData).data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
@@ -121,6 +121,14 @@ export class PostsTimeline extends BaseTimeline<RawTweetData> {
       resolve(t);
     });
   }
+
+  setCursors(rawTimelineData: RawPostsTimelineResponseData): void {
+    let entries = (rawTimelineData.data.user.result.timeline_v2.timeline.instructions.find(
+      (i) => i.type == "TimelineAddEntries"
+    ) as TimelineAddEntries)!.entries;
+    this.cursors.top = (entries.find((e) => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
+    this.cursors.bottom = (entries.find((e) => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
+  } 
 }
 
 export interface PostsTimelineUrlData {
