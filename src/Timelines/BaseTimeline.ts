@@ -28,6 +28,7 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
     top: string
     bottom: string
   } = {} as any
+  private firstStreamLoop: boolean = true
   abstract variables: BaseTimelineUrlData['variables']
   protected query: typeof Queries.timelines[TimelineTypes]
   getUrl = (query: typeof Queries.timelines[TimelineTypes]) => {
@@ -68,8 +69,6 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
 
   abstract scroll(): Promise<timelineTweetReturnData>
 
-  
-
   resetData() {
     this.variables.cursor = undefined;
     this.variables.count = 20;
@@ -93,7 +92,6 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
    * Fetch the timeline
    */
   async fetch() {
-    console.log(this.cursors)
     return new Promise<timelineTweetReturnData>((resolve, reject) => {
       this.client.rest.graphQL({
         query: this.query,
@@ -170,15 +168,21 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
   }) {
     if (minTimeout > maxTimeout) maxTimeout = minTimeout
     let randomTime = minTimeout + Math.floor(Math.random() * (maxTimeout - minTimeout))
-    handleTweets({
-      tweets: this.tweets.cache,
-      rawData: this.cache[this.cache.length - 1]
-    })
-    if(catchUp) this.catchUp({minCatchUpTimeout, maxCatchUpTimeout, maxLoops: maxCatchUpLoops, isComplete: isCatchUpComplete}, handleTweets, () => {
-      this.stream({minTimeout, maxTimeout}, handleTweets)
-    })
+    if(this.firstStreamLoop) {
+      this.firstStreamLoop = false
+
+      handleTweets({
+        tweets: this.tweets.cache,
+        rawData: this.cache[this.cache.length - 1]
+      })
+    }
+    if(catchUp) {
+      this.catchUp({minCatchUpTimeout, maxCatchUpTimeout, maxLoops: maxCatchUpLoops, isComplete: isCatchUpComplete}, handleTweets, () => {
+        this.stream({minTimeout, maxTimeout}, handleTweets)
+      })
+    }
     else {
-      let newTweets = await this.scroll()
+      let newTweets = await this.fetchLatest()
       handleTweets(newTweets)
       if (this.client.debug) console.log(`Streaming ${this.type} timeline in ${randomTime / 1000} seconds`)
       setTimeout(async () => {
