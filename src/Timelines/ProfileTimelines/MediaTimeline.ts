@@ -68,7 +68,7 @@ export class MediaTimeline extends BaseTimeline<RawGridTweetData> {
     let { tweets, rawData } = await this.fetch()
     let instructions = (rawData as RawMediaAddToModuleTimelineResponseData).data.user.result.timeline_v2.timeline.instructions;
     let entries = (instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
-    this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as TopCursorData).content.value;
+    this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.resetData()
     return {
       tweets,

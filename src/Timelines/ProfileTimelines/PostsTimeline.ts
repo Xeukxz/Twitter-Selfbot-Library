@@ -65,7 +65,7 @@ export class PostsTimeline extends BaseTimeline<RawTweetData> {
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch();
     let entries = ((rawData as RawPostsTimelineResponseData).data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
-    this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as TopCursorData).content.value;
+    this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.resetData();
     return {
       tweets,
