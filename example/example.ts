@@ -17,6 +17,7 @@ import fs from "fs";
 const client = new Client({
   headless: true,
   keepPageOpen: false,
+  debug: true,
 });
 
 client.on("ready", async () => {
@@ -45,12 +46,8 @@ client.on("ready", async () => {
 
   // listen for tweets
   elonPosts.on("timelineUpdate", async (tweets: Tweet<RawTweetData>[]) => {
-    console.log("------------------------------------------")
-    console.log("------------------------------------------")
-    console.log("------------------------------------------")
-    console.log(tweets.map((t) => t.text).join("\n"));
-    console.log("------------------------------------------")
-    console.log("------------------------------------------")
+    console.log("--------------- NEW TWEETS --------------")
+    console.log(tweets.map((t) => t.raw.content.itemContent.tweet_results.result.legacy.created_at).join("\n"));
     console.log("------------------------------------------")
   });
 
@@ -67,6 +64,10 @@ client.on("ready", async () => {
     },
   });
 
+  // elonPosts.stream({
+  //   minTimeout: 0.1 * 60 * 1000, // 6 seconds
+  //   maxTimeout: 0.5 * 60 * 1000, // 30 seconds
+  // })
   // create profile for elon musk
   const elon = await client.profiles.fetch({
     username: "elonmusk",

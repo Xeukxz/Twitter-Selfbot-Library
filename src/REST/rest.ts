@@ -84,7 +84,6 @@ export class RESTApiManager {
     }
   }): Promise<AxiosResponse> {
     return new Promise((resolve, reject) => {
-      console.log(variables)
       let features = this.client.features.get(query.metadata.featureSwitches);
       this.get(`https://x.com/i/api/graphql/${query.queryId}/${query.operationName}?variables=${variables.URIEncoded()}&features=${features.URIEncoded()}${fieldToggles ? '&'+encodeURIComponent(JSON.stringify(fieldToggles)) : ''}`).then((res) => {
         fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-${count++}.json`, JSON.stringify(res.data, null, 2));

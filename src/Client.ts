@@ -5,8 +5,8 @@ import puppeteer from "puppeteer";
 import fs from "fs";
 import { Timeline } from "./Timelines";
 import { ProfileManager } from "./Managers/ProfileManager";
-import { config } from "node:process";
 import { Profile } from "./Profile";
+import child_process from "child_process";
 
 export interface ClientParams {
   headless: boolean;
@@ -93,18 +93,18 @@ export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
       );
 
       // Launch the browser and open a new blank page
-      console.log(headless ? "Running in headless mode." : "Running in non-headless mode.")
-      console.log(keepPageOpen ? "Keeping browser open after getting account data." : "Closing browser after getting account data.")
+      if(this.debug) console.log(headless ? "Running in headless mode." : "Running in non-headless mode.")
+      if(this.debug) console.log(keepPageOpen ? "Keeping browser open after getting account data." : "Closing browser after getting account data.")
       const browser = await puppeteer.launch({
         headless: Object.keys(storedData?.cookies ?? storedData)?.length > 0 ? headless : false,
       });
 
       browser.on('disconnected', async () => {
-        if(storedData?.cookies) console.log('Browser has been disconnected, The client will continue running.');
+        if(storedData?.cookies) this.debug ? console.log('Browser has been disconnected, The client will continue running.') : null;
         else {
-          console.log('Browser has been disconnected, Account information has not been gathered. Exiting...');
           await browser.close();
-          process.exit(1);
+          browser.process()?.kill()
+          throw new Error('Account data not found.')
         }
       });
       
@@ -170,12 +170,17 @@ export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
           // fs.writeFileSync('cookies.json', JSON.stringify(cookies))
           // console.log(cookies, cookiesString);
           page.off("request");
-          console.log(
+          if(this.debug) console.log(
             `Got account data. ${
               keepPageOpen ? "Keeping browser open." : "Closing browser."
             }`
           );
-          if (!keepPageOpen) await browser.close();
+          if (!keepPageOpen) {
+            if(this.debug) console.log("Closing browser.");
+            if(!page.isClosed()) await page.close()
+            await browser.close();
+            if(this.debug) console.log("Browser closed.");
+          }
           this.token = token;
           this.csrfToken = csrftoken;
           this.cookies = cookiesString;
