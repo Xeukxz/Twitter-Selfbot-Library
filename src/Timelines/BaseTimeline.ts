@@ -2,13 +2,13 @@ import Axios, { AxiosResponse } from "axios"
 import { TweetManager } from "../Managers/TweetManager"
 import { Client, FeaturesGetData } from "../Client"
 import { ListTimeline, ListTimelineData, RawListTimelineResponseData } from "./ListTimeline"
-import { RawGridTweetData, RawTweetData, Tweet, TweetTypes } from "../Tweet"
+import { RawGridEntryData, RawTweetEntryData, Tweet, TweetTypes } from "../Tweet"
 import { HomeTimeline, RawHomeTimelineResponseData, HomeTimelineData } from './HomeTimeline';
 import { FollowingTimeline, FollowingTimelineData, RawFollowingTimelineResponseData } from "./FollowingTimeline"
 import { PostsTimeline, PostsTimelineData, RawPostsTimelineResponseData } from "./ProfileTimelines/PostsTimeline"
 import { Queries } from "../Routes"
 import { MediaTimeline, MediaTimelineData, RawMediaAddToModuleTimelineResponseData, RawMediaModuleTimelineResponseData } from "./ProfileTimelines/MediaTimeline"
-import { RepliesTimeline } from "./ProfileTimelines/RepliesTimeline"
+import { RawRepliesTimelineResponseData, RepliesTimeline } from "./ProfileTimelines/RepliesTimeline"
 import { EventEmitter } from "events"
 
 export type TimelineData = HomeTimelineData | FollowingTimelineData | ListTimelineData | PostsTimelineData | MediaTimelineData
@@ -21,7 +21,7 @@ export interface TimelineEvents<T extends TweetTypes> {
 export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Record<keyof TimelineEvents<T>, any>> {
   client: Client
   // abstract tweets: TweetManager<T>
-  tweets: TweetManager<T> = new TweetManager<T>()
+  tweets: TweetManager<T>
   type!: TimelineTypes
   abstract cache: RawTimelineResponseData[]
   cursors: {
@@ -32,25 +32,16 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
   private currentStreamTimeout?: NodeJS.Timeout
   abstract variables: BaseTimelineUrlData['variables']
   protected query: typeof Queries.timelines[TimelineTypes]
-  getUrl = (query: typeof Queries.timelines[TimelineTypes]) => {
-    return `https://twitter.com/i/api/graphql/${query.queryId}/${query.operationName}?${this.urlDataString}`
-  }
-  
-  
-  get url() {
-    return `${this.getUrl(this.query)}`;
-  }
+
 
   constructor(client: Client, type: TimelineTypes) {
     super()
     this.client = client
+    this.tweets = new TweetManager<T>(client)
     this.type = type
     this.query = Queries.timelines[this.type]
   }
 
-  get urlDataString() {
-    return `variables=${this.variables.URIEncoded()}&features=${this.features.URIEncoded()}`
-  }
 
   get _variables(): BaseTimelineUrlData['variables'] {
     return {
@@ -60,10 +51,6 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
         return encodeURIComponent(JSON.stringify(this))
       }
     }
-  }
-
-  get features(): FeaturesGetData<typeof this.query.metadata.featureSwitches> {
-    return this.client.features.get(this.query.metadata.featureSwitches)
   }
 
   abstract fetchLatest(): Promise<TimelineTweetReturnData>
@@ -79,7 +66,7 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
    * effectively creates a new timeline
    */
   async refresh() {
-    this.tweets = new TweetManager()
+    this.tweets = new TweetManager(this.client)
     this.cache = []
     let {
       tweets,
@@ -294,7 +281,7 @@ export type TimelineTypes = 'home' | 'following' | 'list' | 'posts' | 'media' | 
 
 export type Timeline = ListTimeline | HomeTimeline | FollowingTimeline | PostsTimeline | MediaTimeline | RepliesTimeline
 
-export type TimelineTweetEntryData = [...RawTweetData[], Cursor, Cursor]
+export type TimelineTweetEntryData<T> = [...T[], Cursor, Cursor]
 
 export interface CursorData {
   entryId: `cursor-${"top" | "bottom"}-${number}`,
@@ -323,7 +310,7 @@ export interface BottomCursorData extends CursorData {
 
 export type Cursor = TopCursorData | BottomCursorData
 
-export type RawTimelineResponseData = RawListTimelineResponseData | RawHomeTimelineResponseData | RawFollowingTimelineResponseData | RawPostsTimelineResponseData | RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData
+export type RawTimelineResponseData = RawListTimelineResponseData | RawHomeTimelineResponseData | RawFollowingTimelineResponseData | RawPostsTimelineResponseData | RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData | RawRepliesTimelineResponseData
 
 
 export interface NewListTimelineData {
@@ -367,11 +354,21 @@ export interface TimelineShowAlert {
   }[];
 }
 
-export interface TimelineAddEntries {
+export interface TimelineAddEntries<T> {
   type: "TimelineAddEntries";
-  entries: TimelineTweetEntryData;
+  entries: TimelineTweetEntryData<T>;
 }
 
 export interface TimelineClearCache {
   type: "TimelineClearCache";
+}
+
+export interface TimelinePinEntry {
+  type: "TimelinePinEntry";
+  entry: TimelineAddEntries<RawTweetEntryData>;
+}
+
+export interface TimelineTerminateTimeline {
+  type: "TimelineTerminateTimeline";
+  direction: string;
 }

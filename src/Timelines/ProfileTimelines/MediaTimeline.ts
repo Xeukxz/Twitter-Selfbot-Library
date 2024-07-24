@@ -1,7 +1,7 @@
 import { Client } from "../../Client";
 import { Profile } from "../../Profile";
 import {
-  RawGridTweetData,
+  RawGridEntryData,
   TweetTypes,
 } from "../../Tweet";
 import fs from "fs";
@@ -13,6 +13,7 @@ import {
   RawTimelineResponseData,
   TimelineAddEntries,
   TimelineClearCache,
+  TimelineTerminateTimeline,
   TimelineTweetEntryData,
   TopCursorData,
 } from "../BaseTimeline";
@@ -24,7 +25,7 @@ export interface MediaTimelineData {
   count?: number;
 }
 
-export class MediaTimeline extends BaseTimeline<RawGridTweetData> {
+export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
   cache: RawMediaAddToModuleTimelineResponseData[] = [];
   profile!: Profile;
   private profileUsername: string;
@@ -43,21 +44,6 @@ export class MediaTimeline extends BaseTimeline<RawGridTweetData> {
     this.profileUsername = data.username;
   }
 
-  get url() {
-    return `https://twitter.com/i/api/graphql/V7H0Ap3_Hh2FyS75OCDO3Q/UserTweets?${this.urlDataString}`;
-  }
-
-  get urlDataString() {
-    return `variables=${this.variables.URIEncoded()}&features=${this.features.URIEncoded()}`;
-  }
-
-
-  // get features(): PostsTimelineUrlData['features'] {
-  //   return {
-  //     ...super.features
-  //   }
-  // }
-
   /**
    * Fetches the latest tweets from the timeline
    * @returns RawListTimelineData[]
@@ -67,7 +53,7 @@ export class MediaTimeline extends BaseTimeline<RawGridTweetData> {
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch()
     let instructions = (rawData as RawMediaAddToModuleTimelineResponseData).data.user.result.timeline_v2.timeline.instructions;
-    let entries = (instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
+    let entries = (instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawGridEntryData>)!.entries;
     this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.resetData()
     return {
@@ -85,7 +71,7 @@ export class MediaTimeline extends BaseTimeline<RawGridTweetData> {
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch()
     let instructions = (rawData as RawMediaAddToModuleTimelineResponseData).data.user.result.timeline_v2.timeline.instructions;
-    let entries = (instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
+    let entries = (instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawGridEntryData>)!.entries;
     this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
     this.resetData()
     return {
@@ -105,7 +91,7 @@ export class MediaTimeline extends BaseTimeline<RawGridTweetData> {
       this.variables.userId = this.profile.userId;
 
       let fetchData: {
-        tweets: Tweet<RawGridTweetData>[];
+        tweets: Tweet<RawGridEntryData>[];
         rawData: RawMediaAddToModuleTimelineResponseData;
       } = {
         tweets: [],
@@ -153,7 +139,7 @@ export class MediaTimeline extends BaseTimeline<RawGridTweetData> {
       }
 
       super.fetch().then(nextFetchResults => {
-        fetchData.tweets.push(...(nextFetchResults.tweets as Tweet<RawGridTweetData>[]));
+        fetchData.tweets.push(...(nextFetchResults.tweets as Tweet<RawGridEntryData>[]));
         // if(this.client.debug) fs.writeFileSync(`${__dirname}/../../../debug/debug-media-1.json`, JSON.stringify(fetchData.rawData, null, 2))
         // if(this.client.debug) fs.writeFileSync(`${__dirname}/../../../debug/debug-media-2.json`, JSON.stringify(nextFetchResults.rawData, null, 2))
 
@@ -171,7 +157,7 @@ export class MediaTimeline extends BaseTimeline<RawGridTweetData> {
   }
 
   async buildTweetsFromCache(data: RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData ) {
-    return new Promise<Tweet<RawGridTweetData>[]>((resolve, reject) => {
+    return new Promise<Tweet<RawGridEntryData>[]>((resolve, reject) => {
       if (this.client.debug)
         fs.writeFileSync(
           `${__dirname}/../../../debug/debug-media.json`,
@@ -187,7 +173,7 @@ export class MediaTimeline extends BaseTimeline<RawGridTweetData> {
             data.data.user.result.timeline_v2.timeline.instructions.find(
               (i) => i.type == "TimelineAddToModule"
             ) as TimelineAddToModule
-          )!.moduleItems as RawGridTweetData[]) || []
+          )!.moduleItems as RawGridEntryData[]) || []
         );
         resolve(t);
       }
@@ -195,7 +181,7 @@ export class MediaTimeline extends BaseTimeline<RawGridTweetData> {
   }
 
   setCursors(rawTimelineData: RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData): void {
-    let entries = (rawTimelineData.data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
+    let entries = (rawTimelineData.data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawGridEntryData>)!.entries;
     this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
   }
@@ -236,12 +222,6 @@ export interface RawMediaModuleTimelineResponseData {
     };
   };
 }
-
-interface TimelineTerminateTimeline {
-  type: "TimelineTerminateTimeline";
-  direction: string;
-}
-
 interface MediaModuleTimelineAddEntries {
   type: "TimelineAddEntries";
   entries: [ModuleTimelineEntry, any, any];
@@ -252,7 +232,7 @@ interface ModuleTimelineEntry {
   sortIndex: string;
   content: {
     entryType: string;
-    items: RawGridTweetData[];
+    items: RawGridEntryData[];
     displayType: string;
     clientEventInfo: {
       component: string;
@@ -284,7 +264,7 @@ export interface RawMediaAddToModuleTimelineResponseData {
 
 interface TimelineAddToModule {
   type: "TimelineAddToModule";
-  moduleItems: RawGridTweetData[];
+  moduleItems: RawGridEntryData[];
   moduleEntryId: string;
 }
 

@@ -2,13 +2,17 @@ import { Client } from "../../Client";
 import { TweetManager } from "../../Managers";
 import { Profile } from "../../Profile";
 import { Queries } from "../../Routes";
-import { RawTweetData, Tweet, TweetTypes } from "../../Tweet";
+import { RawTweetEntryData, Tweet, TweetTypes } from "../../Tweet";
 import {
   BaseTimeline,
   BaseTimelineUrlData,
   BottomCursorData,
   Cursor,
   RawTimelineResponseData,
+  TimelineAddEntries,
+  TimelineClearCache,
+  TimelinePinEntry,
+  TimelineShowAlert,
   TimelineTweetEntryData,
   TopCursorData,
 } from "../BaseTimeline";
@@ -19,9 +23,7 @@ export interface PostsTimelineData {
   count?: number;
 }
 
-export class PostsTimeline extends BaseTimeline<RawTweetData> {
-  // variables: ProfileTimelineUrlData['variables']
-  // features: ProfileTimelineUrlData['features']
+export class PostsTimeline extends BaseTimeline<RawTweetEntryData> {
   profile!: Profile;
   cache: RawPostsTimelineResponseData[] = [];
   private profileUsername: string;
@@ -41,21 +43,6 @@ export class PostsTimeline extends BaseTimeline<RawTweetData> {
     this.profileUsername = data.username;
   }
 
-  get url() {
-    return `https://twitter.com/i/api/graphql/V7H0Ap3_Hh2FyS75OCDO3Q/UserTweets?${this.urlDataString}`;
-  }
-
-  get urlDataString() {
-    return `variables=${this.variables.URIEncoded()}&features=${this.features.URIEncoded()}`;
-  }
-
-
-  // get features(): PostsTimelineUrlData['features'] {
-  //   return {
-  //     ...super.features
-  //   }
-  // }
-
   /**
    * Fetches the latest tweets from the timeline
    * @returns RawListTimelineData[]
@@ -64,7 +51,7 @@ export class PostsTimeline extends BaseTimeline<RawTweetData> {
     this.variables.cursor = this.cursors.top;
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch();
-    let entries = ((rawData as RawPostsTimelineResponseData).data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
+    let entries = ((rawData as RawPostsTimelineResponseData).data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>)!.entries;
     this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.resetData();
     return {
@@ -81,7 +68,7 @@ export class PostsTimeline extends BaseTimeline<RawTweetData> {
     this.variables.cursor = this.cursors.bottom;
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch();
-    let entries = ((rawData as RawPostsTimelineResponseData).data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
+    let entries = ((rawData as RawPostsTimelineResponseData).data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>)!.entries;
     this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
     this.resetData();
     return {
@@ -105,17 +92,17 @@ export class PostsTimeline extends BaseTimeline<RawTweetData> {
   }
 
   async buildTweetsFromCache(data: RawPostsTimelineResponseData) {
-    return new Promise<Tweet<RawTweetData>[]>((resolve, reject) => {
+    return new Promise<Tweet<RawTweetEntryData>[]>((resolve, reject) => {
       // console.log(data.data.list.tweets_timeline)
       if (this.client.debug)
         fs.writeFileSync(
-          `${__dirname}/../../../debug/debug-home.json`,
+          `${__dirname}/../../../debug/debug-posts.json`,
           JSON.stringify(data, null, 2)
         );
       let t = this.tweets.addTweets(
         ((data.data.user.result.timeline_v2.timeline.instructions.find(
           (i) => i.type == "TimelineAddEntries"
-        ) as TimelineAddEntries)!.entries as RawTweetData[]) || []
+        ) as TimelineAddEntries<RawTweetEntryData>)!.entries as RawTweetEntryData[]) || []
       );
       // console.log(t)
       resolve(t);
@@ -125,7 +112,7 @@ export class PostsTimeline extends BaseTimeline<RawTweetData> {
   setCursors(rawTimelineData: RawPostsTimelineResponseData): void {
     let entries = (rawTimelineData.data.user.result.timeline_v2.timeline.instructions.find(
       (i) => i.type == "TimelineAddEntries"
-    ) as TimelineAddEntries)!.entries;
+    ) as TimelineAddEntries<RawTweetEntryData>)!.entries;
     this.cursors.top = (entries.find((e) => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.cursors.bottom = (entries.find((e) => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
   } 
@@ -151,7 +138,7 @@ export interface RawPostsTimelineResponseData {
             instructions: (
               | TimelineClearCache
               | TimelinePinEntry
-              | TimelineAddEntries
+              | TimelineAddEntries<RawTweetEntryData>
               | TimelineShowAlert
             )[];
             metadata: {
@@ -164,39 +151,4 @@ export interface RawPostsTimelineResponseData {
       };
     };
   };
-}
-
-interface TimelineClearCache {
-  type: "TimelineClearCache";
-}
-
-interface TimelinePinEntry {
-  type: "TimelinePinEntry";
-  entry: TimelineTweetEntryData;
-}
-
-interface TimelineAddEntries {
-  type: "TimelineAddEntries";
-  entries: TimelineTweetEntryData;
-}
-
-interface TimelineShowAlert {
-  type: "TimelineShowAlert";
-  alertType: "NewTweets";
-  triggerDelayMs: number;
-  displayDurationMs: number;
-  userResults: {
-    // Marked as optional
-    result: {
-      _typename: "User";
-      id: string;
-      rest_id: string;
-      affiliates_highlighted_label: any;
-      has_graduated_access: boolean;
-      is_blue_verified: boolean;
-      profile_image_shape: string;
-      legacy: any;
-      professional: any;
-    };
-  }[];
 }

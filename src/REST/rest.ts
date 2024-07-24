@@ -77,7 +77,7 @@ export class RESTApiManager {
     fieldToggles
   }: {
     query: Queries,
-    variables: BaseTimelineUrlData['variables'],
+    variables: BaseTimelineUrlData['variables'] | any,
     method?: 'get' | 'post'
     fieldToggles?: {
       [key: string]: boolean

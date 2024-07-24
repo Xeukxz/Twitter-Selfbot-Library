@@ -1,6 +1,6 @@
-import { RawTweetData, Tweet } from "../Tweet";
+import { RawTweetEntryData, Tweet } from "../Tweet";
 import { Client } from "../Client";
-import { BaseTimeline, BaseTimelineUrlData, BottomCursorData, Cursor, TimelineTweetEntryData, TopCursorData } from "./BaseTimeline";
+import { BaseTimeline, BaseTimelineUrlData, BottomCursorData, Cursor, TimelineAddEntries, TimelineTweetEntryData, TopCursorData } from "./BaseTimeline";
 import fs from 'fs';
 import { Queries } from "../Routes";
 import { TweetManager } from "../Managers";
@@ -11,15 +11,8 @@ export interface ListTimelineData {
 }
 
 
-export class ListTimeline extends BaseTimeline<RawTweetData> {
-  // variables: ListTimelineUrlData['variables']
-  // features: ListTimelineUrlData['features']
+export class ListTimeline extends BaseTimeline<RawTweetEntryData> {
   cache: RawListTimelineResponseData[] = []
-  // listData: {
-  //   id: string
-  //   name: string
-  //   description: string
-  // }
   id: string
 
   variables: ListTimelineUrlData['variables'] = {
@@ -32,16 +25,6 @@ export class ListTimeline extends BaseTimeline<RawTweetData> {
     this.variables.listId = data.id
   }
 
-  get url() {
-    return `https://twitter.com/i/api/graphql/F9aW7tjdTWE9m5qHqzEpUA/ListLatestTweetsTimeline?${this.urlDataString}`
-  }
-
-  // get features(): ListTimelineUrlData['features'] {
-  //   return {
-  //     ...super.features
-  //   }
-  // }
-
   /**
    * Fetches the latest tweets from the timeline
    * @returns RawListTimelineData[]
@@ -50,7 +33,7 @@ export class ListTimeline extends BaseTimeline<RawTweetData> {
     this.variables.cursor = this.cursors.top;
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch();
-    let entries = ((rawData as RawListTimelineResponseData).data.list.tweets_timeline.timeline.instructions[0].entries as TimelineTweetEntryData);
+    let entries = ((rawData as RawListTimelineResponseData).data.list.tweets_timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>).entries;
     this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.resetData();
     return {
@@ -67,7 +50,7 @@ export class ListTimeline extends BaseTimeline<RawTweetData> {
     this.variables.cursor = this.cursors.bottom;
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch();
-    let entries = ((rawData as RawListTimelineResponseData).data.list.tweets_timeline.timeline.instructions[0].entries as TimelineTweetEntryData);
+    let entries = ((rawData as RawListTimelineResponseData).data.list.tweets_timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>).entries;
     this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
     this.resetData();
     return {
@@ -77,17 +60,17 @@ export class ListTimeline extends BaseTimeline<RawTweetData> {
   }
 
   buildTweetsFromCache(data: RawListTimelineResponseData) {
-    return new Promise<Tweet<RawTweetData>[]>((resolve, reject) => {
+    return new Promise<Tweet<RawTweetEntryData>[]>((resolve, reject) => {
       // console.log(data.data.list.tweets_timeline)
       if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-list.json`, JSON.stringify(data, null, 2))
-      let t = this.tweets.addTweets(data.data.list.tweets_timeline.timeline.instructions[0].entries as RawTweetData[])
+      let t = this.tweets.addTweets(data.data.list.tweets_timeline.timeline.instructions[0].entries as RawTweetEntryData[])
       // console.log(t)
       resolve(t)
     })
   }
 
   setCursors(rawTimelineData: RawListTimelineResponseData): void {
-    let entries = (rawTimelineData.data.list.tweets_timeline.timeline.instructions[0].entries as TimelineTweetEntryData);
+    let entries = (rawTimelineData.data.list.tweets_timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>).entries;
     this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
   }
@@ -106,10 +89,7 @@ export interface RawListTimelineResponseData {
       tweets_timeline: {
         timeline: {
           id: string
-          instructions: [{
-            type: "TimelineAddEntries";
-            entries: TimelineTweetEntryData;
-          }]
+          instructions: [TimelineAddEntries<RawTweetEntryData>]
           metadata: {
             scribeConfig: {
               page: string

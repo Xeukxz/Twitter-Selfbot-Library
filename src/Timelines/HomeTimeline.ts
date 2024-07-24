@@ -1,4 +1,4 @@
-import { RawTweetData, Tweet, TweetTypes } from "../Tweet";
+import { RawTweetEntryData, Tweet, TweetTypes } from "../Tweet";
 import { Client, FeaturesGetData } from "../Client";
 import { BaseTimeline, BaseTimelineUrlData, TimelineTweetEntryData, NewTimelineData, NewHomeTimelineData, TimelineAddEntries, TimelineShowAlert, Cursor, TopCursorData, BottomCursorData, RawTimelineResponseData } from "./BaseTimeline";
 import fs from 'fs';
@@ -9,9 +9,7 @@ export interface HomeTimelineData {
   count?: number;
 }
 
-export class HomeTimeline extends BaseTimeline<RawTweetData> {
-  // variables: HomeTimelineUrlData["variables"];
-  // features: HomeTimelineUrlData["features"];
+export class HomeTimeline extends BaseTimeline<RawTweetEntryData> {
   cache: RawHomeTimelineResponseData[] = [];
   variables: HomeTimelineUrlData["variables"] = {
     includePromotedContent: true,
@@ -28,21 +26,6 @@ export class HomeTimeline extends BaseTimeline<RawTweetData> {
 
   }
 
-  get url() {
-    return `${this.getUrl(this.query)}`;
-  }
-
-
-  // get features(): FeaturesGetData<typeof this.query.metadata.featureSwitches> {
-  //   return this.client.features.get(this.query.metadata.featureSwitches);
-  // }
-
-  // static async new(client: Client) {
-  //   const timeline = new this(client);
-  //   await timeline.fetch();
-  //   return timeline;
-  // }
-
   /**
    * Fetches the latest tweets from the timeline
    * @returns RawListTimelineData[]
@@ -51,7 +34,7 @@ export class HomeTimeline extends BaseTimeline<RawTweetData> {
     this.variables.cursor = this.cursors.top;
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch();
-    let entries = ((rawData as RawHomeTimelineResponseData).data.home.home_timeline_urt.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
+    let entries = ((rawData as RawHomeTimelineResponseData).data.home.home_timeline_urt.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>)!.entries;
     this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.resetData();
     return {
@@ -68,7 +51,7 @@ export class HomeTimeline extends BaseTimeline<RawTweetData> {
     this.variables.cursor = this.cursors.bottom;
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch();
-    let entries = ((rawData as RawHomeTimelineResponseData).data.home.home_timeline_urt.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
+    let entries = ((rawData as RawHomeTimelineResponseData).data.home.home_timeline_urt.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>)!.entries;
     this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
     this.resetData();
     return {
@@ -78,19 +61,19 @@ export class HomeTimeline extends BaseTimeline<RawTweetData> {
   }
 
   buildTweetsFromCache(data: RawHomeTimelineResponseData) {
-    return new Promise<Tweet<RawTweetData>[]>((resolve, reject) => {
+    return new Promise<Tweet<RawTweetEntryData>[]>((resolve, reject) => {
       // console.log(data.data.list.tweets_timeline)
       if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-home.json`, JSON.stringify(data, null, 2));
       let t = this.tweets.addTweets(
-        (data.data.home.home_timeline_urt.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries as RawTweetData[]
-      ) as Tweet<RawTweetData>[];
+        (data.data.home.home_timeline_urt.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>)!.entries as RawTweetEntryData[]
+      ) as Tweet<RawTweetEntryData>[];
       // console.log(t)
       resolve(t);
     });
   }
 
   setCursors(rawTimelineData: RawHomeTimelineResponseData): void {
-    let entries = (rawTimelineData.data.home.home_timeline_urt.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)!.entries;
+    let entries = (rawTimelineData.data.home.home_timeline_urt.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>)!.entries;
     this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
   
@@ -109,7 +92,7 @@ export interface RawHomeTimelineResponseData {
   data: {
     home: {
       home_timeline_urt: {
-        instructions: (TimelineAddEntries | TimelineShowAlert)[];
+        instructions: (TimelineAddEntries<RawTweetEntryData> | TimelineShowAlert)[];
         responseObjects: {
           key: string;
           value: {
