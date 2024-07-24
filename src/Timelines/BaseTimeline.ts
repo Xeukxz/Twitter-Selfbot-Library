@@ -29,6 +29,7 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
     bottom: string
   } = {} as any
   private firstStreamLoop: boolean = true
+  private currentStreamTimeout?: NodeJS.Timeout
   abstract variables: BaseTimelineUrlData['variables']
   protected query: typeof Queries.timelines[TimelineTypes]
   getUrl = (query: typeof Queries.timelines[TimelineTypes]) => {
@@ -65,9 +66,9 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
     return this.client.features.get(this.query.metadata.featureSwitches)
   }
 
-  abstract fetchLatest(): Promise<timelineTweetReturnData>
+  abstract fetchLatest(): Promise<TimelineTweetReturnData>
 
-  abstract scroll(): Promise<timelineTweetReturnData>
+  abstract scroll(): Promise<TimelineTweetReturnData>
 
   resetData() {
     this.variables.cursor = undefined;
@@ -92,7 +93,7 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
    * Fetch the timeline
    */
   async fetch() {
-    return new Promise<timelineTweetReturnData>((resolve, reject) => {
+    return new Promise<TimelineTweetReturnData>((resolve, reject) => {
       this.client.rest.graphQL({
         query: this.query,
         variables: this.variables
@@ -163,7 +164,7 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
      */
     isCatchUpComplete?: (tweets: Tweet<T>[]) => boolean
 
-  }, handleTweets: (tweets: timelineTweetReturnData) => void = (tweets: timelineTweetReturnData) => {
+  }, handleTweets: (tweets: TimelineTweetReturnData) => void = (tweets: TimelineTweetReturnData) => {
     this.emit('timelineUpdate', tweets.tweets)
   }) {
     if (minTimeout > maxTimeout) maxTimeout = minTimeout
@@ -185,7 +186,7 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
       let newTweets = await this.fetchLatest()
       handleTweets(newTweets)
       if (this.client.debug) console.log(`Streaming ${this.type} timeline in ${randomTime / 1000} seconds`)
-      setTimeout(async () => {
+      this.currentStreamTimeout = setTimeout(async () => {
         this.stream({minTimeout, maxTimeout}, handleTweets)
       }, randomTime)
     }
@@ -240,7 +241,7 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
      * The current loop number, this will be set automatically
      */
     _current?: number
-  }, handleTweets: (tweets: timelineTweetReturnData) => void, onCatchUpComplete: () => void) {
+  }, handleTweets: (tweets: TimelineTweetReturnData) => void, onCatchUpComplete: () => void) {
     if (minCatchUpTimeout > maxCatchUpTimeout) maxCatchUpTimeout = minCatchUpTimeout
     let randomTime = minCatchUpTimeout + Math.floor(Math.random() * (maxCatchUpTimeout - minCatchUpTimeout))
     let newRawTweetsData = await this.scroll()
@@ -257,15 +258,22 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
       return onCatchUpComplete()
     }
     if (this.client.debug) console.log(`Catching up ${this.type} timeline in ${randomTime / 1000} seconds`)
-    setTimeout(() => {
+      this.currentStreamTimeout = setTimeout(() => {
       this.catchUp({minCatchUpTimeout, maxCatchUpTimeout, maxLoops, isComplete, _current: _current + 1}, handleTweets, onCatchUpComplete)
     }, randomTime);
+  }
+
+  /**
+   * Stops the timeline stream
+   */
+  endStream() {
+    clearTimeout(this.currentStreamTimeout)
   }
   
   abstract setCursors(rawTimelineData: RawTimelineResponseData): void
 }
 
-export interface timelineTweetReturnData {
+export interface TimelineTweetReturnData {
   tweets: Tweet<TweetTypes>[],
   rawData: RawTimelineResponseData
 }
@@ -274,10 +282,6 @@ export interface BaseTimelineUrlData {
   variables: {
     count: number;
     cursor?: string;
-    // withCommunity: boolean; // not in list
-    // includePromotedContent: boolean; // not in list
-    // latestControlAvailable: boolean; // not in list
-    // listId: string; // list only
     URIEncoded: () => string;
   };
   features: FeaturesGetData<Queries['metadata']['featureSwitches']>
