@@ -6,18 +6,15 @@ import {
   MediaTimeline,
   PostsTimeline,
   RepliesTimeline,
-  RawTweetData,
+  RawTweetEntryData,
   Tweet,
   TweetTypes,
+  Timeline,
 } from "../src";
-import fs from "fs";
-
-// TODO: Fix how timelines handle cursors
+import { Profile } from "../src/Profile";
 
 const client = new Client({
   headless: true,
-  keepPageOpen: false,
-  debug: true,
 });
 
 client.on("ready", async () => {
@@ -45,9 +42,9 @@ client.on("ready", async () => {
   })) as PostsTimeline;
 
   // listen for tweets
-  elonPosts.on("timelineUpdate", async (tweets: Tweet<RawTweetData>[]) => {
+  elonPosts.on("timelineUpdate", async (tweets: Tweet<RawTweetEntryData>[]) => {
     console.log("--------------- NEW TWEETS --------------")
-    console.log(tweets.map((t) => t.raw.content.itemContent.tweet_results.result.legacy.created_at).join("\n"));
+    console.log(tweets.map((t) => `${t.createdAt} - ${t.text}`).join("\n"));
     console.log("------------------------------------------")
   });
 
@@ -64,14 +61,14 @@ client.on("ready", async () => {
     },
   });
 
-  // elonPosts.stream({
-  //   minTimeout: 0.1 * 60 * 1000, // 6 seconds
-  //   maxTimeout: 0.5 * 60 * 1000, // 30 seconds
-  // })
-  // create profile for elon musk
-  const elon = await client.profiles.fetch({
-    username: "elonmusk",
-  });
+  setTimeout(() => {
+    elonPosts.endStream();
+  }, 1*60*1000);
+
+  // // create profile for elon musk
+  // const elon = await client.profiles.fetch({
+  //   username: "elonmusk",
+  // });
 
   // // create replies timeline through profile
   // const elonReplies = await elon.timelines.fetch('replies') as RepliesTimeline
@@ -93,3 +90,12 @@ client.on("ready", async () => {
   //   ).join('\n'))
   // })
 });
+
+client.on('timelineCreate', async (timeline: Timeline) => {
+  console.log('Timeline Created:', timeline.type) // 'list' || 'home' || 'following' || 'posts' || 'replies' || 'media'
+  console.log(timeline.tweets.cache.length, 'tweets cached')
+})
+
+client.on('profileCreate', async (profile: Profile) => {
+  console.log('Profile Created:', profile.username)
+})

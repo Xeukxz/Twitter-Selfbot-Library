@@ -8,7 +8,6 @@ import { ListTimeline, ListTimelineUrlData } from "../Timelines/ListTimeline";
 import { PostsTimeline } from "../Timelines/ProfileTimelines/PostsTimeline";
 import { MediaTimeline } from "../Timelines/ProfileTimelines/MediaTimeline";
 import { RepliesTimeline } from "../Timelines/ProfileTimelines/RepliesTimeline";
-
 export class TimelineManager {
   client: Client
   cache: Timeline[] = [];
@@ -28,19 +27,14 @@ export class TimelineManager {
       )
 
     if(!existing) {
-      let timelineData: TimelineData & Omit<TimelineFetchData, 'type'> = {
-        count: 20,
-        ...data
-      }
-      if('type' in timelineData) delete timelineData.type
-      existing = new Timelines[data.type](this.client, timelineData as any) // 😭
+      let { type, ...timelineData } = data // Omit type
+      existing = new Timelines[data.type](this.client, timelineData as any)
       let {
         tweets,
         rawData
       } = await existing.fetch()
 
       existing.setCursors(rawData as any)
-      
       
       this.cache.push(existing)
       console.log('created timeline')

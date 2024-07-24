@@ -44,7 +44,6 @@ export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
   /**
    * Create a new client
    * @param headless Whether or not to run the browser in headless mode
-   * @param keepPageOpen Whether or not to keep the browser open after getting the account data
    * 
    */
   constructor({
