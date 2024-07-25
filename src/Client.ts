@@ -76,30 +76,38 @@ export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
 
       if(this.debug) {
         // ensure debug folder exists
-        if (!fs.existsSync(`${__dirname}\\..\\debug`)) {
-          fs.mkdirSync(`${__dirname}\\..\\debug`);
+        if (!fs.existsSync(`${__dirname}/../debug`)) {
+          fs.mkdirSync(`${__dirname}/../debug`);
           console.log("Debug folder created.");
         }
       }
 
       // ensure storage file exists
-      if (!fs.existsSync(`${__dirname}\\..\\accountData.json`)) {
-        fs.writeFileSync(`${__dirname}\\..\\accountData.json`, "{}");
+      if (!fs.existsSync(`${__dirname}/../accountData.json`)) {
+        fs.writeFileSync(`${__dirname}/../accountData.json`, "{}");
         console.log("Account data file created.");
       }
-      let storedData = JSON.parse(
-        fs.readFileSync(`${__dirname}\\..\\accountData.json`, "utf-8")
-      );
-
+      let storedData = fs.readFileSync(`${__dirname}/../accountData.json`, "utf-8")
+      if(storedData == "") storedData = "{}"
+      let parsedStoredData = JSON.parse(storedData);
+      
+      if(Object.keys(parsedStoredData?.cookies ?? parsedStoredData).length > 0) {
+        if(this.debug) console.log("Found stored account data.");
+      } else {
+        if(this.debug) console.log("No stored account data found.");
+        headless = false;
+      }
+      
       // Launch the browser and open a new blank page
       if(this.debug) console.log(headless ? "Running in headless mode." : "Running in non-headless mode.")
       if(this.debug) console.log(keepPageOpen ? "Keeping browser open after getting account data." : "Closing browser after getting account data.")
       const browser = await puppeteer.launch({
-        headless: Object.keys(storedData?.cookies ?? storedData)?.length > 0 ? headless : false,
+        headless: headless,
+        
       });
 
       browser.on('disconnected', async () => {
-        if(storedData?.cookies) this.debug ? console.log('Browser has been disconnected, The client will continue running.') : null;
+        if(parsedStoredData?.cookies) this.debug ? console.log('Browser has been disconnected, The client will continue running.') : null;
         else {
           await browser.close();
           browser.process()?.kill()
@@ -109,8 +117,8 @@ export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
       
       const page = await browser.newPage();
       // if stored data is an empty object
-      if (Object.keys(storedData?.cookies ?? storedData)?.length > 0)
-        await page.setCookie(...storedData.cookies);
+      if (Object.keys(parsedStoredData?.cookies ?? parsedStoredData)?.length > 0)
+        await page.setCookie(...parsedStoredData.cookies);
       else {
         await page.setViewport({ width: 1080, height: 1024 });
         console.log("Please login to the account you wish to automate.");
@@ -156,15 +164,15 @@ export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
           let cookiesString = cookies
             .map((cookie) => `${cookie.name}=${cookie.value}`)
             .join("; ");
-          storedData = {
+          parsedStoredData = {
             Authorisation: token,
             "x-csrf-token": csrftoken,
             cookies: cookies,
             cookiesString: cookiesString,
           };
           fs.writeFileSync(
-            `${__dirname}\\..\\accountData.json`,
-            JSON.stringify(storedData, null, 2)
+            `${__dirname}/../accountData.json`,
+            JSON.stringify(parsedStoredData, null, 2)
           );
           // fs.writeFileSync('cookies.json', JSON.stringify(cookies))
           // console.log(cookies, cookiesString);
