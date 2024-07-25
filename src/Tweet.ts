@@ -23,6 +23,7 @@ export class Tweet<T extends TweetTypes = TweetTypes> {
   views!: number;
   bookmarksCount?: number;
   createdAt!: Date;
+  isRetweet: boolean = false;
   unavailable: boolean = false;
   raw!: RawTweetData | RawProfileConversationTweetData;
   protected query = Queries.tweet;
@@ -94,6 +95,9 @@ export class Tweet<T extends TweetTypes = TweetTypes> {
       };
       return;
     }
+
+    if(tweetData.legacy.retweeted_status_result) this.isRetweet = true;
+
 
     let userData = tweetData.core.user_results;
     this.id = tweetData.rest_id;
@@ -320,6 +324,14 @@ export interface RawTweetData {
     retweeted: boolean;
     user_id_str: string;
     id_str: string;
+    retweeted_status_result?: {
+      result: ({
+        __typename: string;
+      } & RawTweetData) | {
+        __typename: string;
+        tweet: RawTweetData;
+      }
+    }
   };
 }
 
