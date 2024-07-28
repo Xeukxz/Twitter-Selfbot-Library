@@ -3,7 +3,7 @@ import { Queries } from "./Routes";
 import { TimelineTerminateTimeline } from './Timelines';
 import { TimelineAddEntries } from './Timelines/BaseTimeline';
 
-export class Tweet<T extends TweetTypes = TweetTypes> {
+export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
   client: Client;
   id!: string;
   user!: {
@@ -13,9 +13,15 @@ export class Tweet<T extends TweetTypes = TweetTypes> {
     profilePictureUrl: string;
   };
   media?: {
-    type: string;
+    type: "video";
+    variants: {
+      bitrate: number;
+      url: string;
+    }[]
+  } | {
+    type: "image";
     url: string;
-  }[];
+  };
   text?: string;
   likesCount?: number;
   retweetsCount?: number;
@@ -24,6 +30,8 @@ export class Tweet<T extends TweetTypes = TweetTypes> {
   bookmarksCount?: number;
   createdAt!: Date;
   isRetweet: boolean = false;
+  retweetedTweet?: Tweet;
+  quotedTweet?: Tweet;
   unavailable: boolean = false;
   raw!: RawTweetData | RawProfileConversationTweetData;
   protected query = Queries.tweet;
@@ -42,25 +50,29 @@ export class Tweet<T extends TweetTypes = TweetTypes> {
     }
   }
 
-  constructor(client: Client, data?: T) {
+  constructor(client: Client, RawEntryOrTweetData?: T | TweetTypes) {
     this.client = client;
-    if(!data) return;
+    if(!RawEntryOrTweetData) return;
     try {
-      this.buildTweet(Tweet.ParseEntryToData(data), data);
+      this.buildTweet(Tweet.ParseEntryToData(RawEntryOrTweetData), RawEntryOrTweetData);
     } catch (e) {
-      if(client.debug) console.log(JSON.stringify(data, null, 2));
-      console.log(`Bad tweet: ${data.entryId}`);
+      if(client.debug) console.log(JSON.stringify(RawEntryOrTweetData, null, 2));
+      console.log(`Bad tweet: ${(RawEntryOrTweetData as T).entryId || (RawEntryOrTweetData as TweetTypes).rest_id}`);
       throw new Error(`${e}`);
     }
   }
 
-  static ParseEntryToData(entry: TweetTypes) {
+  static getTweetFromResult(tweetResult: RawTweetResult): TweetTypes {
+    return "tweet" in tweetResult.result ? tweetResult.result.tweet : tweetResult.result;
+  }
+
+  static ParseEntryToData(entry: TweetEntryTypes | TweetTypes): TweetTypes {
     let tweetResult = 
-      (entry as RawTweetEntryData).content?.itemContent?.tweet_results?.result ||
-      (entry as RawGridEntryData).item?.itemContent?.tweet_results?.result ||
-      (entry as RawProfileConversationEntryData).content?.items[1]?.item?.itemContent?.tweet_results?.result;      
+      (entry as RawTweetEntryData).content?.itemContent?.tweet_results ||
+      (entry as RawGridEntryData).item?.itemContent?.tweet_results ||
+      (entry as RawProfileConversationEntryData).content?.items[1]?.item?.itemContent?.tweet_results;
       
-    let tweetData = "tweet" in tweetResult ? tweetResult.tweet : tweetResult;
+    let tweetData = tweetResult ? Tweet.getTweetFromResult(tweetResult) : entry as TweetTypes;
     return tweetData;
   }
   
@@ -82,11 +94,11 @@ export class Tweet<T extends TweetTypes = TweetTypes> {
     })
   }
 
-  buildTweet(tweetData: RawTweetData, rawData: T) {
+  buildTweet(tweetData: TweetTypes, rawData: T | TweetTypes) {
     this.raw = tweetData;
     if(!tweetData) {
       this.unavailable = true;
-      this.id = rawData.entryId.split("-")[1];
+      this.id = (rawData as T).entryId?.split("-")[1] || "";
       this.user = {
         id: "",
         name: "",
@@ -96,7 +108,18 @@ export class Tweet<T extends TweetTypes = TweetTypes> {
       return;
     }
 
-    if(tweetData.legacy.retweeted_status_result) this.isRetweet = true;
+    let retweetResult = (tweetData.legacy.retweeted_status_result);
+    if(retweetResult) {
+      this.isRetweet = true;
+      this.retweetedTweet = new Tweet(this.client)
+      this.retweetedTweet.buildTweet(Tweet.getTweetFromResult(retweetResult), rawData);
+    }
+
+    let quotedResult = tweetData.quoted_status_result;
+    if(quotedResult) {
+      this.quotedTweet = new Tweet(this.client);
+      this.quotedTweet.buildTweet(Tweet.getTweetFromResult(quotedResult), rawData);
+    }
 
 
     let userData = tweetData.core.user_results;
@@ -115,21 +138,49 @@ export class Tweet<T extends TweetTypes = TweetTypes> {
     this.bookmarksCount = tweetData.legacy.bookmark_count;
     this.views = parseInt(tweetData.views.count);
 
-    if(tweetData.legacy.entities.media) {
-      this.media = tweetData.legacy.entities.media.map((media) => {
-        return {
-          type: media.type,
-          url: media.media_url_https,
-        };
-      });
+    let otherMediaSource = (this.quotedTweet || this.retweetedTweet)?.media;
+
+    if(otherMediaSource) {
+      this.media = otherMediaSource;
+    } else if(tweetData.legacy.entities.media) {
+      
+      this.media = tweetData.legacy.entities.media[0].type == "video" ? {
+        type: tweetData.legacy.entities.media[0].type,
+        variants: tweetData.legacy.entities.media[0].video_info.variants.filter(m => !m.url.includes("m3u8")).map((media) => {
+          return {
+            bitrate: media.bitrate,
+            url: media.url,
+          };
+        }) 
+      } : {
+        type: "image",
+        url: tweetData.legacy.entities.media[0].media_url_https
+      }
     }
-    this.text = tweetData.legacy.full_text;
+    this.text = (tweetData as RawProfileConversationTweetData).note_tweet?.note_tweet_results?.result.text ?? tweetData.legacy.full_text;
 
   }
 }
+export type TweetTypes = RawTweetData | RawProfileConversationTweetData
+export type TweetEntryTypes = RawTweetEntryData | RawGridEntryData | RawProfileConversationEntryData;
+export interface RawTweetResult {
+  result: ({
+    __typename: string;
+  } & RawTweetData) | {
+    __typename: string;
+    tweet: RawTweetData;
+  }
+}
 
-export type TweetTypes = RawTweetEntryData | RawGridEntryData | RawProfileConversationEntryData;
-
+export interface RawProfileConversationTweetResult {
+  result: ({
+    __typename: string;
+  } & RawProfileConversationTweetData) | {
+    __typename: string;
+    tweet: RawProfileConversationTweetData;
+  }
+  tweetDisplayType?: string;
+}
 export interface RawTweetData {
   rest_id: string;
   core: {
@@ -201,6 +252,7 @@ export interface RawTweetData {
     state: string;
   };
   source: string;
+  quoted_status_result?: RawTweetResult
   legacy: {
     bookmark_count: number;
     bookmarked: boolean;
@@ -324,15 +376,8 @@ export interface RawTweetData {
     retweeted: boolean;
     user_id_str: string;
     id_str: string;
-    retweeted_status_result?: {
-      result: ({
-        __typename: string;
-      } & RawTweetData) | {
-        __typename: string;
-        tweet: RawTweetData;
-      }
-    }
-  };
+    retweeted_status_result?: RawTweetResult;
+  }
 }
 
 export type RawProfileConversationTweetData = RawTweetData & {
@@ -405,14 +450,7 @@ export interface RawTweetEntryData {
     itemContent: {
       itemType: string;
       __typename: string;
-      tweet_results: {
-        result: ({
-          __typename: string;
-        } & RawTweetData) | {
-          __typename: string;
-          tweet: RawTweetData;
-        }
-      };
+      tweet_results: RawTweetResult;
       tweetDisplayType: string;
       socialContext: {
         type: string;
@@ -442,14 +480,7 @@ export interface RawGridEntryData {
     itemContent: {
       itemType: string;
       __typename: string;
-      tweet_results: {
-        result: ({
-          __typename: string;
-        } & RawTweetData) | {
-          __typename: string;
-          tweet: RawTweetData;
-        }
-      };
+      tweet_results: RawTweetResult;
       tweetDisplayType: string;
     };
   };
@@ -467,15 +498,7 @@ export interface RawProfileConversationEntryData {
         itemContent: {
           itemType: string;
           __typename: string;
-          tweet_results: {
-            result: ({
-              __typename: string;
-            } & RawProfileConversationTweetData) | {
-              __typename: string;
-              tweet: RawProfileConversationTweetData;
-            };
-            tweetDisplayType?: string;
-          };
+          tweet_results: RawProfileConversationTweetResult;
           clientEventInfo?: {
             component: string;
             element: string;

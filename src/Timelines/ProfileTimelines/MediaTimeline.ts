@@ -2,7 +2,7 @@ import { Client } from "../../Client";
 import { Profile } from "../../Profile";
 import {
   RawGridEntryData,
-  TweetTypes,
+  TweetEntryTypes,
 } from "../../Tweet";
 import fs from "fs";
 import {
@@ -82,7 +82,7 @@ export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
 
   fetch() {
     return new Promise<{
-      tweets: Tweet<TweetTypes>[];
+      tweets: Tweet<TweetEntryTypes>[];
       rawData: RawTimelineResponseData;
     }>(async (resolve, reject) => {
       this.profile = await this.client.profiles.fetch({

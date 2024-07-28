@@ -2,7 +2,7 @@ import Axios, { AxiosResponse } from "axios"
 import { TweetManager } from "../Managers/TweetManager"
 import { Client, FeaturesGetData } from "../Client"
 import { ListTimeline, ListTimelineData, RawListTimelineResponseData } from "./ListTimeline"
-import { RawGridEntryData, RawTweetEntryData, Tweet, TweetTypes } from "../Tweet"
+import { RawGridEntryData, RawTweetEntryData, Tweet, TweetEntryTypes } from "../Tweet"
 import { HomeTimeline, RawHomeTimelineResponseData, HomeTimelineData } from './HomeTimeline';
 import { FollowingTimeline, FollowingTimelineData, RawFollowingTimelineResponseData } from "./FollowingTimeline"
 import { PostsTimeline, PostsTimelineData, RawPostsTimelineResponseData } from "./ProfileTimelines/PostsTimeline"
@@ -14,11 +14,11 @@ import { EventEmitter } from "events"
 export type TimelineData = HomeTimelineData | FollowingTimelineData | ListTimelineData | PostsTimelineData | MediaTimelineData
 
 
-export interface TimelineEvents<T extends TweetTypes> {
+export interface TimelineEvents<T extends TweetEntryTypes> {
   timelineUpdate: Tweet<T>[];
 }
 
-export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Record<keyof TimelineEvents<T>, any>> {
+export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitter<Record<keyof TimelineEvents<T>, any>> {
   client: Client
   // abstract tweets: TweetManager<T>
   tweets: TweetManager<T>
@@ -261,7 +261,7 @@ export abstract class BaseTimeline<T extends TweetTypes> extends EventEmitter<Re
 }
 
 export interface TimelineTweetReturnData {
-  tweets: Tweet<TweetTypes>[],
+  tweets: Tweet<TweetEntryTypes>[],
   rawData: RawTimelineResponseData
 }
 
@@ -365,7 +365,7 @@ export interface TimelineClearCache {
 
 export interface TimelinePinEntry {
   type: "TimelinePinEntry";
-  entry: TimelineAddEntries<RawTweetEntryData>;
+  entry: RawTweetEntryData;
 }
 
 export interface TimelineTerminateTimeline {

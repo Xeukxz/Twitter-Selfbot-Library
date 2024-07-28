@@ -10,8 +10,8 @@ import {
   Tweet,
   TweetTypes,
   Timeline,
+  Profile
 } from "../src";
-import { Profile } from "../src/Profile";
 
 const client = new Client({
   headless: true,
@@ -44,7 +44,7 @@ client.on("ready", async () => {
   // listen for tweets
   elonPosts.on("timelineUpdate", async (tweets: Tweet<RawTweetEntryData>[]) => {
     console.log("--------------- NEW TWEETS --------------")
-    console.log(tweets.map((t) => `${t.createdAt} - ${t.text}`).join("\n"));
+    console.log(tweets.map((t) => `${t.createdAt} - ${t.isRetweet ? t.retweetedTweet?.text : t.text}`).join("\n"));
     console.log("------------------------------------------")
   });
 

@@ -2,7 +2,7 @@ import { Client } from "../../Client";
 import { TweetManager } from "../../Managers";
 import { Profile } from "../../Profile";
 import { Queries } from "../../Routes";
-import { RawProfileConversationEntryData, RawTweetEntryData, Tweet, TweetTypes } from "../../Tweet";
+import { RawProfileConversationEntryData, RawTweetEntryData, Tweet, TweetEntryTypes } from "../../Tweet";
 import {
   BaseTimeline,
   BaseTimelineUrlData,
@@ -86,7 +86,7 @@ export class RepliesTimeline extends BaseTimeline<RawTweetEntryData | RawProfile
 
   fetch() {
     return new Promise<{
-      tweets: Tweet<TweetTypes>[];
+      tweets: Tweet<TweetEntryTypes>[];
       rawData: RawTimelineResponseData;
     }>(async (resolve, reject) => {
       this.profile = await this.client.profiles.fetch({

@@ -1,4 +1,4 @@
-import { RawTweetEntryData, Tweet, TweetTypes } from "../Tweet";
+import { RawTweetEntryData, Tweet, TweetEntryTypes } from "../Tweet";
 import { Client, FeaturesGetData } from "../Client";
 import { BaseTimeline, BaseTimelineUrlData, TimelineTweetEntryData, NewTimelineData, NewHomeTimelineData, TimelineAddEntries, TimelineShowAlert, Cursor, TopCursorData, BottomCursorData, RawTimelineResponseData } from "./BaseTimeline";
 import fs from 'fs';

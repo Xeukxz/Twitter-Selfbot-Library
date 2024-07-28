@@ -1,8 +1,8 @@
 import { Client } from "../Client";
 import { TimelineAddEntries } from "../Timelines";
-import { RawGridEntryData, RawProfileConversationEntryData, RawTweetEntryData, Tweet, TweetTypes } from "../Tweet";
+import { RawGridEntryData, RawProfileConversationEntryData, RawTweetEntryData, Tweet, TweetEntryTypes } from "../Tweet";
 
-export class TweetManager<TweetData extends TweetTypes>  {
+export class TweetManager<TweetData extends TweetEntryTypes>  {
   client: Client
   cache: Tweet<TweetData>[] = [];
   
