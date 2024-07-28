@@ -12,7 +12,7 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
     username: string;
     profilePictureUrl: string;
   };
-  media?: {
+  media?: ({
     type: "video";
     variants: {
       bitrate: number;
@@ -21,7 +21,7 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
   } | {
     type: "image";
     url: string;
-  };
+  })[];
   text?: string;
   likesCount?: number;
   retweetsCount?: number;
@@ -144,9 +144,9 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
       this.media = otherMediaSource;
     } else if(tweetData.legacy.entities.media) {
       
-      this.media = tweetData.legacy.entities.media[0].type == "video" ? {
-        type: tweetData.legacy.entities.media[0].type,
-        variants: tweetData.legacy.entities.media[0].video_info.variants.filter(m => !m.url.includes("m3u8")).map((media) => {
+      this.media = tweetData.legacy.entities.media.map(m => m.type == "video" ? {
+        type: m.type,
+        variants: m.video_info.variants.filter(m => !m.url.includes("m3u8")).map((media) => {
           return {
             bitrate: media.bitrate,
             url: media.url,
@@ -154,11 +154,11 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
         }) 
       } : {
         type: "image",
-        url: tweetData.legacy.entities.media[0].media_url_https
-      }
+        url: m.media_url_https
+      });  
     }
+    
     this.text = (tweetData as RawProfileConversationTweetData).note_tweet?.note_tweet_results?.result.text ?? tweetData.legacy.full_text;
-
   }
 }
 export type TweetTypes = RawTweetData | RawProfileConversationTweetData
@@ -267,7 +267,7 @@ export interface RawTweetData {
         indices: number[];
         media_key: string;
         media_url_https: string;
-        type: string;
+        type: "video" | "photo";
         url: string;
         ext_media_availability: {
           status: string;
@@ -321,7 +321,7 @@ export interface RawTweetData {
         indices: number[];
         media_key: string;
         media_url_https: string;
-        type: string;
+        type: "video" | "photo";
         url: string;
         ext_media_availability: {
           status: string;
