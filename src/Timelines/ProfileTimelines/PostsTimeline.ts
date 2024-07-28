@@ -99,13 +99,18 @@ export class PostsTimeline extends BaseTimeline<RawTweetEntryData> {
           `${__dirname}/../../../debug/debug-posts.json`,
           JSON.stringify(data, null, 2)
         );
-      let t = this.tweets.addTweets(
+      let tweets = this.tweets.addTweets(
         ((data.data.user.result.timeline_v2.timeline.instructions.find(
           (i) => i.type == "TimelineAddEntries"
         ) as TimelineAddEntries<RawTweetEntryData>)!.entries as RawTweetEntryData[]) || []
       );
+      let pinnedTweet = (data.data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelinePinEntry") as TimelinePinEntry)?.entry as RawTweetEntryData;
+      if(pinnedTweet) tweets = [
+        ...this.tweets.addTweets([pinnedTweet]),
+        ...tweets
+      ];
       // console.log(t)
-      resolve(t);
+      resolve(tweets);
     });
   }
 

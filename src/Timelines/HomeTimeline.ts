@@ -64,11 +64,11 @@ export class HomeTimeline extends BaseTimeline<RawTweetEntryData> {
     return new Promise<Tweet<RawTweetEntryData>[]>((resolve, reject) => {
       // console.log(data.data.list.tweets_timeline)
       if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-home.json`, JSON.stringify(data, null, 2));
-      let t = this.tweets.addTweets(
+      let tweets = this.tweets.addTweets(
         (data.data.home.home_timeline_urt.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>)!.entries as RawTweetEntryData[]
       ) as Tweet<RawTweetEntryData>[];
       // console.log(t)
-      resolve(t);
+      resolve(tweets);
     });
   }
 

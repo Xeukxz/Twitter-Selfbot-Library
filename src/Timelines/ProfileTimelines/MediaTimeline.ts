@@ -165,17 +165,17 @@ export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
         );
       if (data.data.user.result.timeline_v2.timeline.instructions.length == 3) {
         const module: ModuleTimelineEntry = (data.data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as MediaModuleTimelineAddEntries)!.entries[0]
-        let t = this.tweets.addTweets(module.content.items);
-        resolve(t);
+        let tweets = this.tweets.addTweets(module.content.items);
+        resolve(tweets);
       } else {
-        let t = this.tweets.addTweets(
+        let tweets = this.tweets.addTweets(
           ((
             data.data.user.result.timeline_v2.timeline.instructions.find(
               (i) => i.type == "TimelineAddToModule"
             ) as TimelineAddToModule
           )!.moduleItems as RawGridEntryData[]) || []
         );
-        resolve(t);
+        resolve(tweets);
       }
     });
   }

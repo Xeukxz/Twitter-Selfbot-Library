@@ -63,9 +63,9 @@ export class ListTimeline extends BaseTimeline<RawTweetEntryData> {
     return new Promise<Tweet<RawTweetEntryData>[]>((resolve, reject) => {
       // console.log(data.data.list.tweets_timeline)
       if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-list.json`, JSON.stringify(data, null, 2))
-      let t = this.tweets.addTweets(data.data.list.tweets_timeline.timeline.instructions[0].entries as RawTweetEntryData[])
+      let tweets = this.tweets.addTweets(data.data.list.tweets_timeline.timeline.instructions[0].entries as RawTweetEntryData[])
       // console.log(t)
-      resolve(t)
+      resolve(tweets)
     })
   }
 
