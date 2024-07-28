@@ -1,7 +1,7 @@
 import EventEmitter from "node:events";
 import { TimelineManager } from "./Managers/TimelineManager";
 import { RESTApiManager } from "./REST/rest";
-import puppeteer from "puppeteer";
+import puppeteer, { PuppeteerLaunchOptions } from "puppeteer";
 import fs from "fs";
 import { Timeline } from "./Timelines";
 import { ProfileManager } from "./Managers/ProfileManager";
@@ -9,9 +9,10 @@ import { Profile } from "./Profile";
 import child_process from "child_process";
 
 export interface ClientParams {
-  headless: boolean;
+  headless?: boolean;
   keepPageOpen?: boolean;
   debug?: boolean;
+  puppeteerSettings?: PuppeteerLaunchOptions;
 }
 
 export interface ClientEvents {
@@ -50,12 +51,14 @@ export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
     headless = true,
     keepPageOpen = false,
     debug = false,
+    puppeteerSettings
   }: ClientParams) {
     super();
     this.debug = debug; // ! DEVELOPMENT ONLY
     this.getAccountData({
       headless,
       keepPageOpen,
+      puppeteerSettings
     }).then(() => {
       // console.log("Got account data.");
       this.rest = new RESTApiManager(this);
@@ -71,6 +74,7 @@ export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
   async getAccountData({
     headless,
     keepPageOpen,
+    puppeteerSettings
   }: ClientParams) {
     return new Promise<void>(async (resolve, reject) => {
 
@@ -103,7 +107,7 @@ export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
       if(this.debug) console.log(keepPageOpen ? "Keeping browser open after getting account data." : "Closing browser after getting account data.")
       const browser = await puppeteer.launch({
         headless: headless,
-        
+        ...puppeteerSettings
       });
 
       browser.on('disconnected', async () => {
