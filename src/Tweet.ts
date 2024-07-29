@@ -2,6 +2,7 @@ import { Client, FeaturesGetData } from './Client';
 import { Queries } from "./Routes";
 import { TimelineTerminateTimeline } from './Timelines';
 import { TimelineAddEntries } from './Timelines/BaseTimeline';
+import { TweetRepliesTimeline } from './Timelines/TweetRepliesTimeline';
 
 export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
   client: Client;
@@ -33,8 +34,8 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
   retweetedTweet?: Tweet;
   quotedTweet?: Tweet;
   unavailable: boolean = false;
+  // replies?: TweetRepliesTimeline
   raw!: RawTweetData | RawProfileConversationTweetData;
-  protected query = Queries.tweet;
 
   variables = {
     focalTweetId: this.id,
@@ -62,40 +63,35 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
     }
   }
 
-  static getTweetFromResult(tweetResult: RawTweetResult): TweetTypes {
-    return "tweet" in tweetResult.result ? tweetResult.result.tweet : tweetResult.result;
+  // get method because TweetRepliesTimeline extends BaseTimeline which causes a circular dependency when using Tweet inside BaseTimeline
+  get replies(): Promise<TweetRepliesTimeline> {
+    return this.client.timelines.fetch({
+      type: "tweetReplies",
+      tweetId: this.id
+    }) as Promise<TweetRepliesTimeline>;
+  }
+
+  static getTweetFromResult(tweetResult: RawTweetResult): TweetTypes | undefined {
+    return Object.keys(tweetResult).length == 0 ? undefined : ("tweet" in tweetResult.result ? tweetResult.result.tweet : tweetResult.result);
   }
 
   static ParseEntryToData(entry: TweetEntryTypes | TweetTypes): TweetTypes {
     let tweetResult = 
       (entry as RawTweetEntryData).content?.itemContent?.tweet_results ||
       (entry as RawGridEntryData).item?.itemContent?.tweet_results ||
-      (entry as RawProfileConversationEntryData).content?.items[1]?.item?.itemContent?.tweet_results;
+      (entry as RawProfileConversationEntryData).content?.items[1]?.item?.itemContent?.tweet_results ||
+      (entry as RawConversationThreadEntryData).content.items[0].item.itemContent.tweet_results;
       
     let tweetData = tweetResult ? Tweet.getTweetFromResult(tweetResult) : entry as TweetTypes;
-    return tweetData;
-  }
-  
-  get features(): FeaturesGetData<typeof this.query.metadata.featureSwitches> {
-    return this.client.features.get(this.query.metadata.featureSwitches)
+    return tweetData as TweetTypes;
   }
 
-  fetch() {
-    return new Promise<RawTweetDetailData>((resolve, reject) => {
-      this.client.rest.graphQL({
-        query: this.query,
-        variables: this.variables
-      }).then(async (res) => {
-        resolve(res)
-      }).catch((err) => {
-        console.log(err.response?.data)
-        reject(err)
-      })
-    })
+  async fetch() {
+    return (await this.replies)?.fetch();
   }
 
-  buildTweet(tweetData: TweetTypes, rawData: T | TweetTypes) {
-    this.raw = tweetData;
+  buildTweet(tweetData: TweetTypes | undefined, rawData: T | TweetTypes) {
+    this.raw = tweetData as RawTweetData;
     if(!tweetData) {
       this.unavailable = true;
       this.id = (rawData as T).entryId?.split("-")[1] || "";
@@ -157,12 +153,12 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
         url: m.media_url_https
       });  
     }
-    
+
     this.text = (tweetData as RawProfileConversationTweetData).note_tweet?.note_tweet_results?.result.text ?? tweetData.legacy.full_text;
   }
 }
 export type TweetTypes = RawTweetData | RawProfileConversationTweetData
-export type TweetEntryTypes = RawTweetEntryData | RawGridEntryData | RawProfileConversationEntryData;
+export type TweetEntryTypes = RawTweetEntryData | RawGridEntryData | RawProfileConversationEntryData | RawConversationThreadEntryData;
 export interface RawTweetResult {
   result: ({
     __typename: string;
@@ -550,28 +546,42 @@ export interface RawTweetDetailData {
   }
 }
 
-export interface RawConversationThreadEntryData { // TODO: Define this fully
-  entryId: string;
+export interface RawConversationThreadEntryData {
+  entryId: `conversationthread-${number}`;
   sortIndex: string;
   content: {
-    entryType: string;
-    __typename: string;
-    items: any[];
-    metadata: {
-      conversationMetadata: {
-        allTweetIds: string[];
-        enableDeduplication: boolean;
-      };
-    };
+    entryType: "TimelineTimelineModule";
+    __typename: "TimelineTimelineModule";
+    items: [RawConversationThreadItemData] | [RawConversationThreadItemData, RawConversationThreadItemData];
     displayType: string;
     clientEventInfo: {
-      component: string;
       details: {
-        timelinesDetails: {
-          injectionType: string;
-          controllerData: string;
+        conversationDetails: {
+          conversationSection: string;
         };
       };
     };
+  };
+}
+
+export interface RawConversationThreadItemData {
+  entryId: `conversationthread-${number}-tweet-${string}`;
+  item: {
+    itemContent: {
+      itemType: string;
+      __typename: string;
+      tweet_results: RawTweetResult;
+      tweetDisplayType: string;
+    };
+    clientEventInfo: {
+      details: {
+        conversationDetails: {
+          conversationSection: string;
+        };
+        timelinesDetails: {
+          controllerData: string;
+        };
+      };
+    }
   };
 }

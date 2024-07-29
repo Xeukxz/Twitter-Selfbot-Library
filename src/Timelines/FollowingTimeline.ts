@@ -1,9 +1,7 @@
 import { RawTweetEntryData, Tweet } from "../Tweet";
 import { Client } from "../Client";
-import { BaseTimeline, BaseTimelineUrlData, BottomCursorData, Cursor, RawTimelineResponseData, TimelineAddEntries, TimelineShowAlert, TimelineTweetEntryData, TopCursorData } from "./BaseTimeline";
+import { BaseTimeline, BaseTimelineUrlData, BottomCursorData, TimelineAddEntries, TimelineShowAlert, TopCursorData } from "./BaseTimeline";
 import fs from 'fs';
-import { Queries } from "../Routes";
-import { TweetManager } from "../Managers";
 
 export interface FollowingTimelineData {
   count?: number;

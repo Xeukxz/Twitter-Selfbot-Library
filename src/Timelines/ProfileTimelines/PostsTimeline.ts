@@ -1,19 +1,15 @@
 import { Client } from "../../Client";
-import { TweetManager } from "../../Managers";
 import { Profile } from "../../Profile";
-import { Queries } from "../../Routes";
 import { RawTweetEntryData, Tweet, TweetEntryTypes } from "../../Tweet";
 import {
   BaseTimeline,
   BaseTimelineUrlData,
   BottomCursorData,
-  Cursor,
   RawTimelineResponseData,
   TimelineAddEntries,
   TimelineClearCache,
   TimelinePinEntry,
   TimelineShowAlert,
-  TimelineTweetEntryData,
   TopCursorData,
 } from "../BaseTimeline";
 import fs from "fs";

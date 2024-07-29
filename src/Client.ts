@@ -6,7 +6,6 @@ import fs from "fs";
 import { Timeline } from "./Timelines";
 import { ProfileManager } from "./Managers/ProfileManager";
 import { Profile } from "./Profile";
-import child_process from "child_process";
 
 export interface ClientParams {
   headless?: boolean;

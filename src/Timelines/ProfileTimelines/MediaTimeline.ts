@@ -17,7 +17,6 @@ import {
   TimelineTweetEntryData,
   TopCursorData,
 } from "../BaseTimeline";
-import { TweetManager } from "../../Managers";
 import { Tweet } from '../../Tweet';
 
 export interface MediaTimelineData {

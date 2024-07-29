@@ -1,7 +1,5 @@
 import { Client } from "../../Client";
-import { TweetManager } from "../../Managers";
 import { Profile } from "../../Profile";
-import { Queries } from "../../Routes";
 import { RawProfileConversationEntryData, RawTweetEntryData, Tweet, TweetEntryTypes } from "../../Tweet";
 import {
   BaseTimeline,

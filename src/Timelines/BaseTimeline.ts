@@ -1,17 +1,17 @@
-import Axios, { AxiosResponse } from "axios"
 import { TweetManager } from "../Managers/TweetManager"
 import { Client, FeaturesGetData } from "../Client"
 import { ListTimeline, ListTimelineData, RawListTimelineResponseData } from "./ListTimeline"
-import { RawGridEntryData, RawTweetEntryData, Tweet, TweetEntryTypes } from "../Tweet"
+import { RawTweetEntryData, Tweet, TweetEntryTypes } from "../Tweet"
 import { HomeTimeline, RawHomeTimelineResponseData, HomeTimelineData } from './HomeTimeline';
 import { FollowingTimeline, FollowingTimelineData, RawFollowingTimelineResponseData } from "./FollowingTimeline"
 import { PostsTimeline, PostsTimelineData, RawPostsTimelineResponseData } from "./ProfileTimelines/PostsTimeline"
 import { Queries } from "../Routes"
 import { MediaTimeline, MediaTimelineData, RawMediaAddToModuleTimelineResponseData, RawMediaModuleTimelineResponseData } from "./ProfileTimelines/MediaTimeline"
-import { RawRepliesTimelineResponseData, RepliesTimeline } from "./ProfileTimelines/RepliesTimeline"
+import { RawRepliesTimelineResponseData, RepliesTimeline, RepliesTimelineData } from "./ProfileTimelines/RepliesTimeline"
 import { EventEmitter } from "events"
+import { RawTweetRepliesTimelineResponseData, TweetRepliesTimeline } from "./TweetRepliesTimeline"
 
-export type TimelineData = HomeTimelineData | FollowingTimelineData | ListTimelineData | PostsTimelineData | MediaTimelineData
+export type TimelineData = HomeTimelineData | FollowingTimelineData | ListTimelineData | PostsTimelineData | MediaTimelineData | RepliesTimelineData
 
 
 export interface TimelineEvents<T extends TweetEntryTypes> {
@@ -30,7 +30,7 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
   } = {} as any
   private firstStreamLoop: boolean = true
   private currentStreamTimeout?: NodeJS.Timeout
-  abstract variables: BaseTimelineUrlData['variables']
+  abstract variables: BaseTimelineUrlData['variables'] | any
   protected query: typeof Queries.timelines[TimelineTypes]
 
 
@@ -277,9 +277,9 @@ export interface BaseTimelineUrlData {
   // };
 }
 
-export type TimelineTypes = 'home' | 'following' | 'list' | 'posts' | 'media' | 'replies' // | 'likes' | 'highlights'
+export type TimelineTypes = 'home' | 'following' | 'list' | 'posts' | 'media' | 'replies' | 'tweetReplies' // | 'likes' | 'highlights'
 
-export type Timeline = ListTimeline | HomeTimeline | FollowingTimeline | PostsTimeline | MediaTimeline | RepliesTimeline
+export type Timeline = ListTimeline | HomeTimeline | FollowingTimeline | PostsTimeline | MediaTimeline | RepliesTimeline | TweetRepliesTimeline
 
 export type TimelineTweetEntryData<T> = [...T[], Cursor, Cursor]
 
@@ -310,7 +310,7 @@ export interface BottomCursorData extends CursorData {
 
 export type Cursor = TopCursorData | BottomCursorData
 
-export type RawTimelineResponseData = RawListTimelineResponseData | RawHomeTimelineResponseData | RawFollowingTimelineResponseData | RawPostsTimelineResponseData | RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData | RawRepliesTimelineResponseData
+export type RawTimelineResponseData = RawListTimelineResponseData | RawHomeTimelineResponseData | RawFollowingTimelineResponseData | RawPostsTimelineResponseData | RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData | RawRepliesTimelineResponseData | RawTweetRepliesTimelineResponseData
 
 
 export interface NewListTimelineData {
