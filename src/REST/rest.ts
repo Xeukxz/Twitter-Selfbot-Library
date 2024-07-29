@@ -4,8 +4,6 @@ import fs from 'fs'
 import { BaseTimelineUrlData } from '../Timelines/BaseTimeline';
 import { Queries } from "../Routes";
 
-let count = 0;
-
 export class RESTApiManager {
   client: Client;
   headers: {
@@ -20,6 +18,8 @@ export class RESTApiManager {
     'Connection': string,
     'TE': string,
   }
+  requestCount: number = 0;
+  errorCount: number = 0;
   constructor(client: Client) {
     this.client = client;
     this.headers = {
@@ -86,7 +86,19 @@ export class RESTApiManager {
     return new Promise((resolve, reject) => {
       let features = this.client.features.get(query.metadata.featureSwitches);
       this.get(`https://x.com/i/api/graphql/${query.queryId}/${query.operationName}?variables=${variables.URIEncoded()}&features=${features.URIEncoded()}${fieldToggles ? '&'+encodeURIComponent(JSON.stringify(fieldToggles)) : ''}`).then((res) => {
-        if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-${count++}.json`, JSON.stringify(res.data, null, 2));
+        if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-${this.requestCount++}.json`, JSON.stringify(res.data, null, 2));
+        if(res.data.errors) {
+          console.log(`GraphQL Error: ${(res.data.errors as Array<any>).map(e => e.message).join(' // ')}`);
+          if(this.client.debug) {
+            fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-${this.errorCount++}.json`, JSON.stringify(res.data, null, 2));
+            fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-full-${this.errorCount++}.json`, JSON.stringify(res, null, 2));
+            console.log(`Error written to debug-error-graphql-${this.errorCount}.json`);
+          }
+          if(res.data.errors[0].retry_after !== undefined) setTimeout(() => {
+            (resolve(this.graphQL({query, variables, method, fieldToggles})))
+          }, res.data.errors[0].retry_after);
+          reject(res.data.errors);
+        }
         resolve(res);
       }).catch((err) => {
         reject(err);
