@@ -110,7 +110,8 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
     minCatchUpTimeout = 5 * 60 * 1000,
     maxCatchUpTimeout = 10 * 60 * 1000,
     maxCatchUpLoops = 1000,
-    isCatchUpComplete = () => false
+    isCatchUpComplete = () => false,
+    emitCache = false
   } : {
     /**
      * The minimum timeout interval in milliseconds before fetching the timeline again (default 5s)
@@ -145,6 +146,13 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
      * The maximum number of loops to catch up before stopping
      */
     maxCatchUpLoops?: number
+
+    /**
+     * Whether or not to emit the current cache when the stream starts.  
+     * Defaults to false  
+     * Always true if `catchUp` is true
+     */
+    emitCache?: boolean
     
     /**
      * A function to determine if the catch up is complete
@@ -154,12 +162,13 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
   }, handleTweets: (tweets: TimelineTweetReturnData) => void = (tweets: TimelineTweetReturnData) => {
     this.emit('timelineUpdate', tweets.tweets)
   }) {
+    emitCache = catchUp || emitCache
     if (minTimeout > maxTimeout) maxTimeout = minTimeout
     let randomTime = minTimeout + Math.floor(Math.random() * (maxTimeout - minTimeout))
     if(this.firstStreamLoop) {
       this.firstStreamLoop = false
 
-      handleTweets({
+      if(emitCache) handleTweets({
         tweets: this.tweets.cache,
         rawData: this.cache[this.cache.length - 1]
       })
