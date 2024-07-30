@@ -1,4 +1,5 @@
 import { Client } from "../Client";
+import { inspect } from 'util'
 import Axios, { AxiosResponse } from "axios";
 import fs from 'fs'
 import { BaseTimelineUrlData } from '../Timelines/BaseTimeline';
@@ -90,8 +91,8 @@ export class RESTApiManager {
         if(res.data.errors) {
           console.log(`GraphQL Error: ${(res.data.errors as Array<any>).map(e => e.message).join(' // ')}`);
           if(this.client.debug) {
-            fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-${this.errorCount++}.json`, JSON.stringify(res.data, null, 2));
-            fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-full-${this.errorCount++}.json`, JSON.stringify(res, null, 2));
+            fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-error-${this.errorCount++}.json`, JSON.stringify(res.data, null, 2));
+            fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-full-${this.errorCount}.txt`, inspect(res, {depth: 10}));
             console.log(`Error written to debug-error-graphql-${this.errorCount}.json`);
           }
           if(res.data.errors[0].retry_after !== undefined) setTimeout(() => {
