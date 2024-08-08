@@ -49,7 +49,7 @@ export class PostsTimeline extends BaseTimeline<RawTweetEntryData> {
     let { tweets, rawData } = await this.fetch();
     let entries = ((rawData as RawPostsTimelineResponseData).data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>)!.entries;
     this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
-    this.resetData();
+    this.resetVariables();
     return {
       tweets,
       rawData: this.cache[this.cache.length - 1]
@@ -66,7 +66,7 @@ export class PostsTimeline extends BaseTimeline<RawTweetEntryData> {
     let { tweets, rawData } = await this.fetch();
     let entries = ((rawData as RawPostsTimelineResponseData).data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>)!.entries;
     this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
-    this.resetData();
+    this.resetVariables();
     return {
       tweets,
       rawData: this.cache[this.cache.length - 1]

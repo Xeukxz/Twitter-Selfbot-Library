@@ -67,7 +67,7 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
   get replies(): Promise<TweetRepliesTimeline> {
     return this.client.timelines.fetch({
       type: "tweetReplies",
-      tweetId: this.id
+      tweet: this
     }) as Promise<TweetRepliesTimeline>;
   }
 

@@ -1,4 +1,4 @@
-import { TweetManager } from "../Managers/TweetManager"
+import { TimelineTweetManager } from "../Managers/TimelineTweetManager"
 import { Client, FeaturesGetData } from "../Client"
 import { ListTimeline, ListTimelineData, RawListTimelineResponseData } from "./ListTimeline"
 import { RawTweetEntryData, Tweet, TweetEntryTypes } from "../Tweet"
@@ -10,6 +10,7 @@ import { MediaTimeline, MediaTimelineData, RawMediaAddToModuleTimelineResponseDa
 import { RawRepliesTimelineResponseData, RepliesTimeline, RepliesTimelineData } from "./ProfileTimelines/RepliesTimeline"
 import { EventEmitter } from "events"
 import { RawTweetRepliesTimelineResponseData, TweetRepliesTimeline } from "./TweetRepliesTimeline"
+import fs from 'fs'
 
 export type TimelineData = HomeTimelineData | FollowingTimelineData | ListTimelineData | PostsTimelineData | MediaTimelineData | RepliesTimelineData
 
@@ -21,7 +22,7 @@ export interface TimelineEvents<T extends TweetEntryTypes> {
 export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitter<Record<keyof TimelineEvents<T>, any>> {
   client: Client
   // abstract tweets: TweetManager<T>
-  tweets: TweetManager<T>
+  tweets: TimelineTweetManager<T>
   type!: TimelineTypes
   abstract cache: RawTimelineResponseData[]
   cursors: {
@@ -37,7 +38,7 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
   constructor(client: Client, type: TimelineTypes) {
     super()
     this.client = client
-    this.tweets = new TweetManager<T>(client)
+    this.tweets = new TimelineTweetManager<T>(client)
     this.type = type
     this.query = Queries.timelines[this.type]
   }
@@ -57,7 +58,7 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
 
   abstract scroll(): Promise<TimelineTweetReturnData>
 
-  resetData() {
+  resetVariables() {
     this.variables.cursor = undefined;
     this.variables.count = 20;
   }
@@ -66,7 +67,7 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
    * effectively creates a new timeline
    */
   async refresh() {
-    this.tweets = new TweetManager(this.client)
+    this.tweets = new TimelineTweetManager(this.client)
     this.cache = []
     let {
       tweets,
@@ -92,7 +93,8 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
           rawData: res.data
         })
       }).catch((err) => {
-        console.log(err.response?.data)
+        console.log(`Error fetching ${this.type} timeline`)
+        console.trace(err.response?.data)
         reject(err)
       })
     })
@@ -110,8 +112,8 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
     minCatchUpTimeout = 5 * 60 * 1000,
     maxCatchUpTimeout = 10 * 60 * 1000,
     maxCatchUpLoops = 1000,
+    emitCache = false,
     isCatchUpComplete = () => false,
-    emitCache = false
   } : {
     /**
      * The minimum timeout interval in milliseconds before fetching the timeline again (default 5s)
@@ -159,6 +161,15 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
      */
     isCatchUpComplete?: (tweets: Tweet<T>[]) => boolean
 
+  } = {
+    minTimeout: 5 * 60 * 1000,
+    maxTimeout: 10 * 60 * 1000,
+    catchUp: false,
+    minCatchUpTimeout: 5 * 60 * 1000,
+    maxCatchUpTimeout: 10 * 60 * 1000,
+    maxCatchUpLoops: 1000,
+    emitCache: false,
+    isCatchUpComplete: () => false,
   }, handleTweets: (tweets: TimelineTweetReturnData) => void = (tweets: TimelineTweetReturnData) => {
     this.emit('timelineUpdate', tweets.tweets)
   }) {

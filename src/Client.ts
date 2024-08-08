@@ -6,6 +6,7 @@ import fs from "fs";
 import { Timeline } from "./Timelines";
 import { ProfileManager } from "./Managers/ProfileManager";
 import { Profile } from "./Profile";
+import { GlobalTweetManager } from "./Managers";
 
 export interface ClientParams {
   headless?: boolean;
@@ -27,6 +28,7 @@ export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
   cookies!: string
   rest!: RESTApiManager
   timelines: TimelineManager = new TimelineManager(this)
+  tweets: GlobalTweetManager = new GlobalTweetManager(this)
   profiles: ProfileManager = new ProfileManager(this)
   debug: boolean // writes multiple debug files, not recommended for production
   features!: {
@@ -137,6 +139,9 @@ export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
       this.features = {
         ...JSON.parse(featuresString),
         get: <T extends string[]>(keys: string[]): FeaturesGetData<T> => { //  jesus fucking christ
+          // console.log(keys)
+          // console.log(this.features.config)
+          // console.log(keys.map(key => [key, this.features.config[key]?.value]))
           return {
             ...Object.fromEntries(keys.map(key => [key, this.features.config[key].value])),
             URIEncoded: function() {

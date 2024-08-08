@@ -54,7 +54,7 @@ export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
     let instructions = (rawData as RawMediaAddToModuleTimelineResponseData).data.user.result.timeline_v2.timeline.instructions;
     let entries = (instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawGridEntryData>)!.entries;
     this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
-    this.resetData()
+    this.resetVariables()
     return {
       tweets,
       rawData
@@ -72,7 +72,7 @@ export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
     let instructions = (rawData as RawMediaAddToModuleTimelineResponseData).data.user.result.timeline_v2.timeline.instructions;
     let entries = (instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawGridEntryData>)!.entries;
     this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
-    this.resetData()
+    this.resetVariables()
     return {
       tweets,
       rawData

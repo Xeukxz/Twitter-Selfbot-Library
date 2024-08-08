@@ -29,10 +29,8 @@ export class TimelineManager {
 
     if(!existing) {
       console.log('Creating Timeline')
-      console.log(data)
       let { type, ...timelineData } = data as TimelineFetchData // Omit type
       existing = new MappedTimelines[type](this.client, timelineData as typeof MappedTimelines[typeof type] extends new (client: Client, data: infer D) => any ? D : never);
-      console.log(existing)
       let {
         tweets,
         rawData
@@ -84,10 +82,16 @@ interface ProfileTimelineFetchData extends TimelineBaseFetchData {
   username: string
 }
 
-interface TweetRepliesTimelineFetchData extends TimelineBaseFetchData {
+interface TweetRepliesTimelineFetchDataWithTweet extends TimelineBaseFetchData {
+  type: 'tweetReplies'
+  tweet: Tweet
+}
+interface TweetRepliesTimelineFetchDataWithTweetId extends TimelineBaseFetchData {
   type: 'tweetReplies'
   tweetId: string
 }
+
+type TweetRepliesTimelineFetchData = TweetRepliesTimelineFetchDataWithTweet | TweetRepliesTimelineFetchDataWithTweetId
 
 type TimelineFetchData = TimelineListFetchData | TimelineHomeFetchData | TimelineFollowingFetchData | ProfileTimelineFetchData | TweetRepliesTimelineFetchData
 

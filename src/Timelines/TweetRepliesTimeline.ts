@@ -8,7 +8,7 @@ export interface tweetRepliesTimelineData {
 
 export class TweetRepliesTimeline extends BaseTimeline<RawConversationThreadEntryData | RawTweetEntryData> {
   cache: RawTweetRepliesTimelineResponseData[] = [];
-  tweet!: Tweet<RawTweetEntryData>;
+  tweet?: Tweet<RawTweetEntryData>;
   variables = {
     focalTweetId: undefined as any as string,
     cursor: undefined as any as string,
@@ -24,10 +24,19 @@ export class TweetRepliesTimeline extends BaseTimeline<RawConversationThreadEntr
       return encodeURIComponent(JSON.stringify(this));
     }
   }
-  constructor(client: Client, tweet: Tweet<RawTweetEntryData>) {
+  constructor(client: Client, data: {
+    tweet: Tweet<RawTweetEntryData>
+  } | {
+    tweetId: string
+  }) {
     super(client, "tweetReplies");
-    this.tweet = tweet;
-    this.variables.focalTweetId = tweet.id;
+    if("tweet" in data) {
+      console.log(data.tweet)
+      this.variables.focalTweetId = data.tweet.id;
+      this.tweet = data.tweet
+    } else {
+      this.variables.focalTweetId = data.tweetId;
+    }
   }
 
   async fetchLatest() {
@@ -39,8 +48,7 @@ export class TweetRepliesTimeline extends BaseTimeline<RawConversationThreadEntr
     let { tweets, rawData } = await this.fetch();
     let entries = ((rawData as RawTweetRepliesTimelineResponseData).data.threaded_conversation_with_injections_v2.instructions.find(i => i.type == "TimelineAddEntries") as RawTweetRepliesTimelineAddEntries)!.entries;
     this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as TweetRepliesBottomCursorData).content.itemContent.value;
-    this.resetData();
-    this.variables.referrer = "tweet";
+    this.variables.referrer = "tweet"; // should be set after the first fetch
     return {
       tweets,
       rawData: this.cache[this.cache.length - 1]
@@ -54,11 +62,14 @@ export class TweetRepliesTimeline extends BaseTimeline<RawConversationThreadEntr
       let tweets = entries.filter(e => e.entryId.startsWith("tweet-")) as RawTweetEntryData[];
       let replies = entries.filter(e => e.entryId.startsWith("conversationthread-")) as RawConversationThreadEntryData[];
 
-      let originalTweetEntry = tweets.find(t => t.entryId == "tweet-" + this.tweet.id) as RawTweetEntryData;
-      // if(originalTweetEntry) this.tweets.addTweets([originalTweetEntry]);
-      this.tweet.buildTweet(Tweet.ParseEntryToData(originalTweetEntry), originalTweetEntry);
+      let originalTweetEntry = tweets.find(t => t.entryId == "tweet-" + this.variables.focalTweetId);
+      if(originalTweetEntry) {
+        console.log('Original Tweet Entry:', originalTweetEntry)
+        if(!this.tweet) this.tweet = new Tweet(this.client);
+        this.tweet.buildTweet(Tweet.ParseEntryToData(originalTweetEntry), originalTweetEntry);
+      }
 
-      let parsedTweets = this.tweets.addTweets([...tweets, ...replies])
+      let parsedTweets = this.tweets.addTweets([ ...(originalTweetEntry ? [originalTweetEntry] : []), ...tweets, ...replies])
 
       resolve(parsedTweets);
     });
