@@ -1,13 +1,14 @@
 import { Client } from "../Client";
-import { Tweet, TweetEntryTypes } from "../Tweet";
+import { RawTweetRepliesTimelineAddEntries, RawTweetRepliesTimelineResponseData } from "../Timelines/TweetRepliesTimeline";
+import { RawTweetEntryData, Tweet, TweetEntryTypes } from "../Tweet";
 
-export class TweetManager<TweetData extends TweetEntryTypes>  {
+export class TimelineTweetManager<TweetData extends TweetEntryTypes>  {
   client: Client
   cache: Tweet<TweetData>[] = [];
   
   constructor(client: Client) {
     this.client = client;
-
+    this.client.tweets.addManager(this);
   }
 
   /**
@@ -15,19 +16,15 @@ export class TweetManager<TweetData extends TweetEntryTypes>  {
    *
    * @param id Tweet ID
    */
-  async fetch(id: string) {
-    let tweet = this.cache.find((tweet) => tweet.id === id);
+  fetch(id: string) {
+    let tweet = this.get(id) ?? new Promise<Tweet>(async (resolve, reject) => {
+      resolve(await this.client.tweets.fetch(id));
+    });
     if (tweet) return tweet;
+  }
 
-    // let newTweet: Tweet<RawTweetEntryData> | undefined = new Tweet<RawTweetEntryData>(this.client);
-    // newTweet.id = id;
-    // let data = await newTweet.fetch()
-    // if (data) {
-    //   let entry = data.tweets.find(tweet => tweet.id == id);
-    // } else {
-    //   newTweet = undefined;
-    // }
-    // return newTweet;
+  get(id: string) {
+    return this.cache.find((tweet) => tweet.id === id);
   }
 
   addTweets(tweets: TweetData[]) {
