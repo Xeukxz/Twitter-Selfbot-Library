@@ -1,13 +1,14 @@
 import { Client } from "../Client";
 import { ProfileTimelineTypes } from "../Profile";
 import { Timeline, TimelineTypes } from "../Timelines/BaseTimeline";
-import { FollowingTimeline } from "../Timelines/FollowingTimeline";
-import { HomeTimeline } from "../Timelines/HomeTimeline";
-import { ListTimeline } from "../Timelines/ListTimeline";
-import { PostsTimeline } from "../Timelines/ProfileTimelines/PostsTimeline";
-import { MediaTimeline } from "../Timelines/ProfileTimelines/MediaTimeline";
-import { RepliesTimeline } from "../Timelines/ProfileTimelines/RepliesTimeline";
-import { TweetRepliesTimeline } from "../Timelines/TweetRepliesTimeline";
+import { FollowingTimeline, FollowingTimelineData } from "../Timelines/FollowingTimeline";
+import { HomeTimeline, HomeTimelineData } from "../Timelines/HomeTimeline";
+import { ListTimeline, ListTimelineData } from "../Timelines/ListTimeline";
+import { PostsTimeline, PostsTimelineData } from '../Timelines/ProfileTimelines/PostsTimeline';
+import { MediaTimeline, MediaTimelineData } from "../Timelines/ProfileTimelines/MediaTimeline";
+import { RepliesTimeline, RepliesTimelineData } from '../Timelines/ProfileTimelines/RepliesTimeline';
+import { TweetRepliesTimeline, tweetRepliesTimelineData } from "../Timelines/TweetRepliesTimeline";
+import { Tweet, TweetEntryTypes, TweetTypes } from "../Tweet";
 export class TimelineManager {
   client: Client
   cache: Timeline[] = [];
@@ -19,7 +20,7 @@ export class TimelineManager {
    * Creates or retrieves a timeline
    * 
    */
-  async fetch(data: TimelineFetchData) {
+  async fetch<T extends TimelineFetchData>(data: T): Promise<FetchedInstance<T>> {
     console.log('Fetching Timeline:', data.type)
     let existing = this.cache.find(timeline => 
       (Object.keys(data) as Array<keyof TimelineFetchData>)
@@ -27,8 +28,11 @@ export class TimelineManager {
       )
 
     if(!existing) {
-      let { type, ...timelineData } = data // Omit type
-      existing = new Timelines[data.type](this.client, timelineData as any)
+      console.log('Creating Timeline')
+      console.log(data)
+      let { type, ...timelineData } = data as TimelineFetchData // Omit type
+      existing = new MappedTimelines[type](this.client, timelineData as typeof MappedTimelines[typeof type] extends new (client: Client, data: infer D) => any ? D : never);
+      console.log(existing)
       let {
         tweets,
         rawData
@@ -41,11 +45,14 @@ export class TimelineManager {
       this.client.emit('timelineCreate', existing)
     }
 
-    return existing
+    return existing as FetchedInstance<T>
   }
 }
 
-export const Timelines = {
+// maps the specific timeline to the given type
+type FetchedInstance<T extends TimelineFetchData> = T extends { type: infer U } ? U extends keyof typeof MappedTimelines ? InstanceType<typeof MappedTimelines[U]> : never : never; // I hate typescript
+
+export const MappedTimelines = {
   home: HomeTimeline,
   following: FollowingTimeline,
   list: ListTimeline,

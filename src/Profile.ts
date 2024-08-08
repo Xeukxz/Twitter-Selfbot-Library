@@ -1,5 +1,5 @@
 import { Client, FeaturesGetData } from "./Client"
-import { Timeline } from "./Timelines"
+import { RepliesTimeline, Timeline } from "./Timelines"
 import { PostsTimeline } from "./Timelines/ProfileTimelines/PostsTimeline"
 import { Queries } from './Routes';
 import { ProfileFetchData } from "./Managers";
@@ -82,25 +82,16 @@ export class Profile {
   get timelines() {
     return {
       ...Object.fromEntries(Object.entries(this._timelines).filter(([key, value]) => value)),
-      fetch: async (type: ProfileTimelineTypes): Promise<Timeline> => {
-        return this._timelines[type] ?? new Promise<Timeline>(async (resolve, reject) => {
-          if(type == 'posts' && !this._timelines.posts) 
+      fetch: async<T extends ProfileTimelineTypes> (type: T): Promise<FetchedInstance<T>> => {
+        return this._timelines[type] as FetchedInstance<T> ?? new Promise<FetchedInstance<T>>(async (resolve, reject) => {
+          if(['posts', 'media', 'replies'].includes(type)) {
             resolve(await this.client.timelines.fetch({
               type,
               username: this.username
-            }) as PostsTimeline)
-
-          if(type == 'media' && !this._timelines.media)
-            resolve(await this.client.timelines.fetch({
-              type,
-              username: this.username
-            }) as MediaTimeline)
-          
-          if(type == 'replies' && !this._timelines.replies)
-            resolve(await this.client.timelines.fetch({
-              type,
-              username: this.username
-            }))
+            }) as FetchedInstance<T>)
+          } else {
+            reject(new Error(`${type} is not a valid profile timeline type`))
+          }
         })
       }
     }
@@ -142,8 +133,15 @@ export class Profile {
 }
 
 export type ProfileTimelineTypes = 'posts' | 'media' | 'replies' //| 'highlights' | 'likes' | 'lists'
-export type ProfileTimelines = PostsTimeline | Timeline
+export type ProfileTimelines = PostsTimeline | MediaTimeline | RepliesTimeline
+const MappedProfileTimelines = {
+  posts: PostsTimeline,
+  media: MediaTimeline,
+  replies: RepliesTimeline,
+}
 
+// maps the specific timeline to the given type
+type FetchedInstance<T extends keyof typeof MappedProfileTimelines> = InstanceType<typeof MappedProfileTimelines[T]>
 /* https://x.com/i/api/1.1/friends/following/list.json?include_profile_interstitial_type=1&include_blocking=1&include_blocked_by=1&include_followed_by=1&include_want_retweets=1&include_mute_edge=1&include_can_dm=1&include_can_media_tag=1&include_ext_is_blue_verified=1&include_ext_verified_type=1&include_ext_profile_image_shape=1&skip_status=1&cursor=-1&user_id=1310275768191193088&count=3&with_total_count=true
 {
   "data": {
