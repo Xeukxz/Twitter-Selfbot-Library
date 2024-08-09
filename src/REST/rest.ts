@@ -95,8 +95,9 @@ export class RESTApiManager {
             fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-full-${this.errorCount}.txt`, inspect(res, {depth: 10}));
             console.log(`Error written to debug-error-graphql-${this.errorCount}.json`);
           }
-          if(res.data.errors[0].retry_after !== undefined) setTimeout(() => {
-            (resolve(this.graphQL({query, variables, method, fieldToggles})))
+          if(res.data.errors[0].retry_after !== undefined) setTimeout(async () => {
+            console.log(`Retrying after ${res.data.errors[0].retry_after}ms`);
+            resolve(await this.graphQL({query, variables, method, fieldToggles}))
           }, res.data.errors[0].retry_after);
           reject(res.data.errors);
         }
