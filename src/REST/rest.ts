@@ -103,7 +103,12 @@ export class RESTApiManager {
         }
         resolve(res);
       }).catch((err) => {
-        reject(err);
+        if(err.response?.status == 503) {
+          console.log(`GraphQL Error: 503 Service Unavailable. Retrying in 30000ms.`);
+          setTimeout(async () => {
+            resolve(await this.graphQL({query, variables, method, fieldToggles}))
+          }, 30000);
+        } else reject(err);
       });
     });
   }
