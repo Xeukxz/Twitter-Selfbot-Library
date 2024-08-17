@@ -89,22 +89,22 @@ export class RESTApiManager {
       this.get(`https://x.com/i/api/graphql/${query.queryId}/${query.operationName}?variables=${variables.URIEncoded()}&features=${features.URIEncoded()}${fieldToggles ? '&'+encodeURIComponent(JSON.stringify(fieldToggles)) : ''}`).then((res) => {
         if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-${this.requestCount++}.json`, JSON.stringify(res.data, null, 2));
         if(res.data.errors) {
-          console.log(`GraphQL Error: ${(res.data.errors as Array<any>).map(e => e.message).join(' // ')}`);
+          console.error(`GraphQL Error: ${(res.data.errors as Array<any>).map(e => e.message).join(' // ')}`);
           if(this.client.debug) {
             fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-error-${this.errorCount++}.json`, JSON.stringify(res.data, null, 2));
             fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-full-${this.errorCount}.txt`, inspect(res, {depth: 10}));
-            console.log(`Error written to debug-error-graphql-${this.errorCount}.json`);
+            console.error(`Error written to debug-error-graphql-${this.errorCount}.json`);
           }
           if(res.data.errors[0].retry_after !== undefined) setTimeout(async () => {
-            console.log(`Retrying after ${res.data.errors[0].retry_after}ms`);
+            console.error(`Retrying after ${res.data.errors[0].retry_after}ms`);
             resolve(await this.graphQL({query, variables, method, fieldToggles}))
           }, res.data.errors[0].retry_after);
-          reject(res.data.errors);
+          else reject(res.data.errors);
         }
         resolve(res);
       }).catch((err) => {
         if(err.response?.status == 503) {
-          console.log(`GraphQL Error: 503 Service Unavailable. Retrying in 30000ms.`);
+          console.error(`GraphQL Error: 503 Service Unavailable. Retrying in 30000ms.`);
           setTimeout(async () => {
             resolve(await this.graphQL({query, variables, method, fieldToggles}))
           }, 30000);
