@@ -34,7 +34,6 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
   retweetedTweet?: Tweet;
   quotedTweet?: Tweet;
   unavailable: boolean = false;
-  // replies?: TweetRepliesTimeline
   raw!: RawTweetData | RawProfileConversationTweetData;
 
   variables = {
@@ -197,14 +196,19 @@ export interface RawTweetData {
           description: string;
           entities: {
             description: {
-              urls: unknown[];
+              urls: {
+                display_url: string,
+                expanded_url: string,
+                url: string,
+                indices: [ number, number ]
+              }[];
             };
             url: {
               urls: {
                 display_url: string;
                 expanded_url: string;
                 url: string;
-                indices: number[];
+                indices: [number, number];
               }[];
             };
           };
@@ -293,7 +297,12 @@ export interface RawTweetData {
         original_info: {
           height: number;
           width: number;
-          focus_rects: unknown[];
+          focus_rects: {
+            x: number;
+            y: number;
+            w: number;
+            h: number;
+          }[]
         };
         video_info: {
           aspect_ratio: number[];
@@ -304,9 +313,22 @@ export interface RawTweetData {
           }[];
         };
       }[];
-      user_mentions: unknown[];
-      urls: unknown[];
-      hashtags: unknown[];
+      user_mentions: {
+        id_str: string;
+        name: string;
+        screen_name: string;
+        indices: [number, number];
+      };
+      urls: {
+        display_url: string,
+        expanded_url: string,
+        url: string,
+        indices: [ number, number ]
+      }[];
+      hashtags: {
+        indices: [ number, number ];
+        text: string;    
+      };
       symbols: unknown[];
     };
     extended_entities: {
@@ -347,7 +369,12 @@ export interface RawTweetData {
         original_info: {
           height: number;
           width: number;
-          focus_rects: unknown[];
+          focus_rects: {
+            x: number;
+            y: number;
+            w: number;
+            h: number;
+          }[]
         };
         video_info: {
           aspect_ratio: number[];
@@ -374,41 +401,6 @@ export interface RawTweetData {
     id_str: string;
     retweeted_status_result?: RawTweetResult;
   }
-}
-
-export type RawProfileConversationTweetData = RawTweetData & {
-  note_tweet?: {
-    is_expandable: boolean;
-    note_tweet_results: {
-      result: {
-        id: string;
-        text: string;
-        entity_set: {
-          hashtags: any[];
-          symbols: any[];
-          timestamps: any[];
-          urls: any[];
-          user_mentions: any[];
-        };
-      };
-    };
-  };
-  quoted_status_result?: {
-    result: ({
-      __typename: string;
-    } & Omit<RawProfileConversationTweetData, "quoted_status_result">) | {
-      __typename: string;
-      tweet: Omit<RawProfileConversationTweetData, "quoted_status_result">;
-    }
-  };
-  superFollowsReplyUserResult?: {
-    result: {
-      __typename: string;
-      legacy: {
-        screen_name: string;
-      };
-    };
-  };
   card?: {
     rest_id: string;
     legacy: {
@@ -433,6 +425,54 @@ export type RawProfileConversationTweetData = RawTweetData & {
       name: string;
       url: string;
       user_refs_results: any[];
+    };
+  };
+}
+
+export type RawProfileConversationTweetData = RawTweetData & {
+  note_tweet?: {
+    is_expandable: boolean;
+    note_tweet_results: {
+      result: {
+        id: string;
+        text: string;
+        entity_set: {
+          hashtags: {
+            indices: [ number, number ];
+            text: string;
+          };
+          symbols: any[];
+          timestamps: any[];
+          urls: {
+            display_url: string,
+            expanded_url: string,
+            url: string,
+            indices: [ number, number ]
+          }[];
+          user_mentions: {
+            id_str: string;
+            name: string;
+            screen_name: string;
+            indices: [number, number];
+          };
+        };
+      };
+    };
+  };
+  quoted_status_result?: {
+    result: ({
+      __typename: string;
+    } & Omit<RawProfileConversationTweetData, "quoted_status_result">) | {
+      __typename: string;
+      tweet: Omit<RawProfileConversationTweetData, "quoted_status_result">;
+    }
+  };
+  superFollowsReplyUserResult?: {
+    result: {
+      __typename: string;
+      legacy: {
+        screen_name: string;
+      };
     };
   };
 };
