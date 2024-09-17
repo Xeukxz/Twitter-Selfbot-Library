@@ -153,7 +153,7 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
       });  
     }
 
-    this.text = (tweetData as RawProfileConversationTweetData).note_tweet?.note_tweet_results?.result.text ?? tweetData.legacy.full_text;
+    this.text = (tweetData as RawProfileConversationTweetData).note_tweet?.note_tweet_results?.result.text ?? (this.retweetedTweet?.text ?? tweetData.legacy.full_text);
   }
 }
 export type TweetTypes = RawTweetData | RawProfileConversationTweetData
