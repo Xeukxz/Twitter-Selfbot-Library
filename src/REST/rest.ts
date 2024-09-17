@@ -100,8 +100,7 @@ export class RESTApiManager {
             resolve(await this.graphQL({query, variables, method, fieldToggles}))
           }, res.data.errors[0].retry_after);
           else reject(res.data.errors);
-        }
-        resolve(res);
+        } else resolve(res);
       }).catch((err) => {
         if(err.response?.status == 503) {
           console.error(`GraphQL Error: 503 Service Unavailable. Retrying in 30000ms.`);
