@@ -10,16 +10,15 @@ import { MediaTimeline, MediaTimelineData, RawMediaAddToModuleTimelineResponseDa
 import { RawRepliesTimelineResponseData, RepliesTimeline, RepliesTimelineData } from "./ProfileTimelines/RepliesTimeline"
 import { EventEmitter } from "events"
 import { RawTweetRepliesTimelineResponseData, TweetRepliesTimeline } from "./TweetRepliesTimeline"
-import fs from 'fs'
 
 export type TimelineData = HomeTimelineData | FollowingTimelineData | ListTimelineData | PostsTimelineData | MediaTimelineData | RepliesTimelineData
 
 
 export interface TimelineEvents<T extends TweetEntryTypes> {
-  timelineUpdate: Tweet<T>[];
+  timelineUpdate: [ Tweet<T>[] ]
 }
 
-export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitter<Record<keyof TimelineEvents<T>, any>> {
+export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitter<TimelineEvents<T>> {
   client: Client
   // abstract tweets: TweetManager<T>
   tweets: TimelineTweetManager<T>
@@ -93,8 +92,9 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
           rawData: res.data
         })
       }).catch((err) => {
-        console.log(`Error fetching ${this.type} timeline`)
-        console.trace(err.response?.data)
+        console.error(`Error fetching ${this.type} timeline`)
+        console.error(this.client.rest._trace)
+        if(err.response?.data) console.error(err.response.data)
         reject(err)
       })
     })
@@ -128,7 +128,7 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
     /**
      * Whether or not to catch up on the timeline before streaming
      * 
-     * This will continue to scroll the timeline until all tweets received are already cached
+     * This will continue to scroll the timeline until `maxCatchUpLoops` is reached or `isCatchUpComplete` returns true  
      * 
      * argument properties { minCatchUpTimeout, maxCatchUpTimeout } can be used to set the timeout intervals for catching up
      */
@@ -190,8 +190,7 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
       })
     }
     else {
-      let newTweets = await this.fetchLatest()
-      handleTweets(newTweets)
+      await this.fetchLatest().then(handleTweets).catch(err => console.error(`Failed to stream timeline: ${err}`))
       if (this.client.debug) console.log(`Streaming ${this.type} timeline in ${randomTime / 1000} seconds`)
       this.currentStreamTimeout = setTimeout(async () => {
         this.stream({minTimeout, maxTimeout}, handleTweets)
@@ -251,23 +250,28 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
   }, handleTweets: (tweets: TimelineTweetReturnData) => void, onCatchUpComplete: () => void) {
     if (minCatchUpTimeout > maxCatchUpTimeout) maxCatchUpTimeout = minCatchUpTimeout
     let randomTime = minCatchUpTimeout + Math.floor(Math.random() * (maxCatchUpTimeout - minCatchUpTimeout))
-    let newRawTweetsData = await this.scroll()
-
-    handleTweets(newRawTweetsData)
-
-
-    if(isComplete(newRawTweetsData.tweets as Tweet<T>[])) {
-      console.log(`Catch up complete // ${this.type}`)
-      return onCatchUpComplete()
-    }
-    if(_current >= maxLoops) {
-      console.log(`Max loops reached, stopping catch up // ${this.type}`)
-      return onCatchUpComplete()
-    }
-    if (this.client.debug) console.log(`Catching up ${this.type} timeline in ${randomTime / 1000} seconds`)
+    await this.scroll().then(newTweets => {
+      handleTweets(newTweets)
+  
+      if(isComplete(newTweets.tweets as Tweet<T>[])) {
+        console.log(`Catch up complete // ${this.type}`)
+        return onCatchUpComplete()
+      }
+      if(_current >= maxLoops) {
+        console.log(`Max loops reached, stopping catch up // ${this.type}`)
+        return onCatchUpComplete()
+      }
+      if (this.client.debug) console.log(`Catching up ${this.type} timeline in ${randomTime / 1000} seconds`)
       this.currentStreamTimeout = setTimeout(() => {
-      this.catchUp({minCatchUpTimeout, maxCatchUpTimeout, maxLoops, isComplete, _current: _current + 1}, handleTweets, onCatchUpComplete)
-    }, randomTime);
+        this.catchUp({minCatchUpTimeout, maxCatchUpTimeout, maxLoops, isComplete, _current: _current + 1}, handleTweets, onCatchUpComplete)
+      }, randomTime);
+    }).catch(err => {
+      console.error(`Failed to catch up timeline: ${err}\nTrying again in 10 seconds`)
+      setTimeout(() => {
+        this.catchUp({minCatchUpTimeout, maxCatchUpTimeout, maxLoops, isComplete, _current: _current}, handleTweets, onCatchUpComplete)
+      }, 10000);
+    })
+    
   }
 
   /**

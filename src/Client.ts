@@ -16,13 +16,13 @@ export interface ClientParams {
 }
 
 export interface ClientEvents {
-  ready: void;
-  timelineCreate: Timeline;
-  profileCreate: Profile;
+  ready: [ void ];
+  timelineCreate: [ Timeline ];
+  profileCreate: [ Profile ];
 }
 
 
-export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
+export class Client extends EventEmitter<ClientEvents> {
   token!: string
   csrfToken!: string
   cookies!: string
@@ -69,7 +69,7 @@ export class Client extends EventEmitter<Record<keyof ClientEvents, any>> {
 
   // no idea what this was supposed to do 💀
   async build() {
-
+    
   }
 
   async getAccountData({

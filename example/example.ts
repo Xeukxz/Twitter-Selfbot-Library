@@ -1,16 +1,7 @@
 import {
   Client,
-  FollowingTimeline,
-  HomeTimeline,
-  ListTimeline,
-  MediaTimeline,
-  PostsTimeline,
-  RepliesTimeline,
-  RawTweetEntryData,
-  Tweet,
-  TweetTypes,
   Timeline,
-  Profile
+  Tweet,
 } from "../src";
 
 const client = new Client({
@@ -41,7 +32,7 @@ client.on("ready", async () => {
     username: "elonmusk",
   }));
 
-  // let tweet = await client.tweets.fetch("1818027157370941827")
+  // let tweet = await client.tweets.fetch("1825723913051000851")
 
   // // stream posts timeline
   // elonPosts.stream({
@@ -99,12 +90,12 @@ client.on("ready", async () => {
   ])
 });
 
-client.on('timelineCreate', async (timeline: Timeline) => {
+client.on('timelineCreate', async (timeline) => {
   console.log('Timeline Created:', timeline.type) // 'list' || 'home' || 'following' || 'posts' || 'replies' || 'media'
   console.log(timeline.tweets.cache.length, 'tweets cached')
 })
 
-client.on('profileCreate', async (profile: Profile) => {
+client.on('profileCreate', async (profile) => {
   console.log('Profile Created:', profile.username)
 })
 
@@ -112,7 +103,7 @@ function streamAll(timelines: Timeline[]) {
   timelines.forEach(timeline => {
 
     // manage new tweets
-    timeline.on('timelineUpdate', async (tweets: Tweet<RawTweetEntryData>[]) => {
+    timeline.on('timelineUpdate', async (tweets: Tweet[]) => {
       console.log("--------------- NEW TWEETS --------------")
       console.log(tweets.map(t => `${t.createdAt} - ${t.isRetweet ? t.retweetedTweet?.text : t.text}`).join('\n'))
       console.log("------------------------------------------")

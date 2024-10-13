@@ -1,6 +1,6 @@
 import { Client } from "../Client";
 import { inspect } from 'util'
-import Axios, { AxiosResponse } from "axios";
+import Axios, { AxiosError, AxiosResponse } from "axios";
 import fs from 'fs'
 import { BaseTimelineUrlData } from '../Timelines/BaseTimeline';
 import { Queries } from "../Routes";
@@ -21,6 +21,22 @@ export class RESTApiManager {
   }
   requestCount: number = 0;
   errorCount: number = 0;
+  /**
+   * Tracing data for debugging
+   */
+  _trace: {
+    url: string,
+    time: number,
+    status: string
+    summary: () => string
+  } = {
+    url: 'undefined',
+    time: 0,
+    status: 'undefined',
+    summary: function() {
+      return `Trace: ${this.url}\nTime: ${this.time > 0 ? new Date(this.time).toLocaleString() + `${this.time}` : 'undefined'}\nStatus: ${this.status}`;
+    }
+  };
   constructor(client: Client) {
     this.client = client;
     this.headers = {
@@ -86,24 +102,35 @@ export class RESTApiManager {
   }): Promise<AxiosResponse> {
     return new Promise((resolve, reject) => {
       let features = this.client.features.get(query.metadata.featureSwitches);
-      this.get(`https://x.com/i/api/graphql/${query.queryId}/${query.operationName}?variables=${variables.URIEncoded()}&features=${features.URIEncoded()}${fieldToggles ? '&'+encodeURIComponent(JSON.stringify(fieldToggles)) : ''}`).then((res) => {
+      let url = `https://x.com/i/api/graphql/${query.queryId}/${query.operationName}?variables=${variables.URIEncoded()}&features=${features.URIEncoded()}${fieldToggles ? '&'+encodeURIComponent(JSON.stringify(fieldToggles)) : ''}`;
+      this._trace.url = url;
+      this._trace.time = Date.now();
+      this._trace.status = 'pending';
+      this.get(url).then((res) => {
         if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-${this.requestCount++}.json`, JSON.stringify(res.data, null, 2));
         if(res.data.errors) {
-          console.error(`GraphQL Error: ${(res.data.errors as Array<any>).map(e => e.message).join(' // ')}`);
           if(this.client.debug) {
+            console.error(`GraphQL Error: ${(res.data.errors as Array<any>).map(e => e.message).join(' // ')}`);
             fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-error-${this.errorCount++}.json`, JSON.stringify(res.data, null, 2));
             fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-full-${this.errorCount}.txt`, inspect(res, {depth: 10}));
             console.error(`Error written to debug-error-graphql-${this.errorCount}.json`);
           }
-          if(res.data.errors[0].retry_after !== undefined) setTimeout(async () => {
-            console.error(`Retrying after ${res.data.errors[0].retry_after}ms`);
-            resolve(await this.graphQL({query, variables, method, fieldToggles}))
-          }, res.data.errors[0].retry_after);
-          else reject(res.data.errors);
+          if(res.data.errors[0].retry_after !== undefined) {
+            if(this.client.debug) console.error(`Retrying after ${res.data.errors[0].retry_after}ms`);
+            setTimeout(async () => {
+              resolve(await this.graphQL({query, variables, method, fieldToggles}))
+            }, res.data.errors[0].retry_after);
+          } else reject(res.data.errors);
         } else resolve(res);
-      }).catch((err) => {
+      }).catch((err: AxiosError) => {
+        this._trace.status = `${err.response?.statusText} // Code: ${err.code}`
         if(err.response?.status == 503) {
-          console.error(`GraphQL Error: 503 Service Unavailable. Retrying in 30000ms.`);
+          if(this.client.debug) console.error(`GraphQL Error: 503 Service Unavailable. Retrying in 30000ms.`);
+          setTimeout(async () => {
+            resolve(await this.graphQL({query, variables, method, fieldToggles}))
+          }, 30000);
+        } else if((err as AxiosError).code == 'ECONNRESET') {
+          if(this.client.debug) console.error(`GraphQL Error: ECONNRESET. Retrying in 30000ms.`);
           setTimeout(async () => {
             resolve(await this.graphQL({query, variables, method, fieldToggles}))
           }, 30000);
