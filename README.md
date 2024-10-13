@@ -15,6 +15,11 @@
 ```ts
 const client = new Client({
   headless: true, // If the puppeteer browser should be visible or not.
+  puppeteerSettings: { // Puppeteer launch settings
+
+    // args: ['--no-sandbox', '--disable-setuid-sandbox'], // for some linux environments (see https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md#setting-up-chrome-linux-sandbox)
+  
+  },
 })
 ```
 When initialising the `Client` class for the first time, its creates an `accountData.json` file in the library's root directory.
@@ -33,24 +38,24 @@ client.on('ready', async () => {
   // create home timeline instance
   const home = await client.timelines.fetch({
     type: 'home'
-  }) as HomeTimeline
+  })
 
   // create following timeline instance
   const following = await client.timelines.fetch({
     type: 'following'
-  }) as FollowingTimeline
+  })
 
   // create list timeline instance of list id '1239948255787732993'
   const list = await client.timelines.fetch({
     type: 'list',
     id: '1239948255787732993'
-  }) as ListTimeline
+  })
 
   // create posts timeline without a profile
   const elonPosts = await client.timelines.fetch({
     type: 'posts',
     username: 'elonmusk'
-  }) as PostsTimeline
+  })
 
   // create profile for elon musk
   const elon = await client.profiles.fetch({
@@ -58,11 +63,14 @@ client.on('ready', async () => {
   })
   
   // create replies timeline through profile
-  const elonReplies = await elon.timelines.fetch('replies') as RepliesTimeline
+  const elonReplies = await elon.timelines.fetch('replies')
   
   // create media timeline through profile
-  const elonMedia = await elon.timelines.fetch('media') as MediaTimeline
+  const elonMedia = await elon.timelines.fetch('media')
 
+  // create tweet and get replies timeline
+  const tweet = await client.tweets.fetch("1825723913051000851")
+  const tweetReplies = tweet.replies
 })
 ```
 ### The current available timelines are:
@@ -71,12 +79,14 @@ client.on('ready', async () => {
   - `following` - The "Following" timeline
   - `list` - The timeline of a Twitter list
     - Requires an `id` property
+- **Tweet:**
+  - `tweetReplies` - The replies timeline of a tweet
 - **Profile:**
   - `posts` - The posts timeline of a user
   - `replies` - The replies timeline of a user
   - `media` - The media timeline of a user
 
-  **Note**: Each profile timeline requires a `username` property unless created via `<Profile>.timelines.fetch()`
+**Note**: Each profile timeline requires a `username` property unless created via `<Profile>.timelines.fetch()`
 
 ## Streaming Timelines:
 
@@ -98,6 +108,8 @@ The stream method takes in 2 arguments:
        - default: 10 minutes
      - `maxCatchUpLoops` - The maximum amount of times the catch up will loop before streaming newer tweets
        - default: 1000
+     - `emitCache` - Whether or not to emit the current timeline cache when the stream starts
+       - default: false (always true if `catchUp` is true)
      - `isCatchUpComplete` - a callback function to determine if the catch up is complete, useful for comparing tweets to those already stored in a database
 
 2. **An optional callback function to handle incoming tweets**
