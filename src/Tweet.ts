@@ -318,7 +318,7 @@ export interface RawTweetData {
         name: string;
         screen_name: string;
         indices: [number, number];
-      };
+      }[];
       urls: {
         display_url: string,
         expanded_url: string,
@@ -328,7 +328,7 @@ export interface RawTweetData {
       hashtags: {
         indices: [ number, number ];
         text: string;    
-      };
+      }[];
       symbols: unknown[];
     };
     extended_entities: {
@@ -440,7 +440,7 @@ export type RawProfileConversationTweetData = RawTweetData & {
           hashtags: {
             indices: [ number, number ];
             text: string;
-          };
+          }[];
           symbols: any[];
           timestamps: any[];
           urls: {
@@ -454,7 +454,7 @@ export type RawProfileConversationTweetData = RawTweetData & {
             name: string;
             screen_name: string;
             indices: [number, number];
-          };
+          }[];
         };
       };
     };
