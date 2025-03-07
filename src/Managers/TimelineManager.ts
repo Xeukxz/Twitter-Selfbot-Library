@@ -1,14 +1,16 @@
 import { Client } from "../Client";
 import { ProfileTimelineTypes } from "../Profile";
 import { Timeline, TimelineTypes } from "../Timelines/BaseTimeline";
-import { FollowingTimeline, FollowingTimelineData } from "../Timelines/FollowingTimeline";
-import { HomeTimeline, HomeTimelineData } from "../Timelines/HomeTimeline";
-import { ListTimeline, ListTimelineData } from "../Timelines/ListTimeline";
-import { PostsTimeline, PostsTimelineData } from '../Timelines/ProfileTimelines/PostsTimeline';
-import { MediaTimeline, MediaTimelineData } from "../Timelines/ProfileTimelines/MediaTimeline";
-import { RepliesTimeline, RepliesTimelineData } from '../Timelines/ProfileTimelines/RepliesTimeline';
-import { TweetRepliesTimeline, tweetRepliesTimelineData } from "../Timelines/TweetRepliesTimeline";
-import { Tweet, TweetEntryTypes, TweetTypes } from "../Tweet";
+import { FollowingTimeline } from "../Timelines/FollowingTimeline";
+import { HomeTimeline } from "../Timelines/HomeTimeline";
+import { ListTimeline } from "../Timelines/ListTimeline";
+import { PostsTimeline } from '../Timelines/ProfileTimelines/PostsTimeline';
+import { MediaTimeline } from "../Timelines/ProfileTimelines/MediaTimeline";
+import { RepliesTimeline } from '../Timelines/ProfileTimelines/RepliesTimeline';
+import { TweetRepliesTimeline } from "../Timelines/TweetRepliesTimeline";
+import { Tweet } from "../Tweet";
+import { SearchTimeline, SearchTimelineUrlData } from "../Timelines/SearchTimeline";
+
 export class TimelineManager {
   client: Client
   cache: Timeline[] = [];
@@ -22,9 +24,9 @@ export class TimelineManager {
    */
   async fetch<T extends TimelineFetchData>(data: T): Promise<FetchedInstance<T>> {
     console.log('Fetching Timeline:', data.type)
-    let existing = this.cache.find(timeline => 
-      (Object.keys(data) as Array<keyof TimelineFetchData>)
-        .every((key) => timeline[key] === data[key])
+    let existing = this.cache.find((timeline: Timeline) => 
+      (Object.keys(data) as Array<keyof T>)
+        .every((key) => (timeline as FetchedInstance<T>)[key] === data[key])
       )
 
     if(!existing) {
@@ -57,11 +59,13 @@ export const MappedTimelines = {
   posts: PostsTimeline,
   media: MediaTimeline,
   replies: RepliesTimeline,
-  tweetReplies: TweetRepliesTimeline
+  tweetReplies: TweetRepliesTimeline,
+  search: SearchTimeline
 }
 
 interface TimelineBaseFetchData {
   type: TimelineTypes
+  count?: number
 }
 
 interface TimelineListFetchData extends TimelineBaseFetchData {
@@ -86,12 +90,29 @@ interface TweetRepliesTimelineFetchDataWithTweet extends TimelineBaseFetchData {
   type: 'tweetReplies'
   tweet: Tweet
 }
+
 interface TweetRepliesTimelineFetchDataWithTweetId extends TimelineBaseFetchData {
   type: 'tweetReplies'
   tweetId: string
 }
 
+interface SearchTimelineFetchData extends TimelineBaseFetchData {
+  type: 'search'
+  /**
+   * The search query
+   */
+  query: string;
+  /**
+   * The search target
+   */
+  product: SearchTimelineUrlData["variables"]["product"];
+  /**
+   * The referrer of the search query used in analytics
+   */
+  querySource: SearchTimelineUrlData["variables"]["querySource"];
+}
+
 type TweetRepliesTimelineFetchData = TweetRepliesTimelineFetchDataWithTweet | TweetRepliesTimelineFetchDataWithTweetId
 
-type TimelineFetchData = TimelineListFetchData | TimelineHomeFetchData | TimelineFollowingFetchData | ProfileTimelineFetchData | TweetRepliesTimelineFetchData
+type TimelineFetchData = TimelineListFetchData | TimelineHomeFetchData | TimelineFollowingFetchData | ProfileTimelineFetchData | TweetRepliesTimelineFetchData | SearchTimelineFetchData
 

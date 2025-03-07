@@ -1,122 +1,101 @@
-import {
-  Client,
-  Timeline,
-  Tweet,
-} from "../src";
+import { Client, Timeline, Tweet } from "../src";
 
 const client = new Client({
-  headless: true,
+  headless: true, // If the puppeteer browser should be visible or not.
+  puppeteerSettings: {
+    // Puppeteer launch settings
+    // args: ['--no-sandbox', '--disable-setuid-sandbox'], // for some linux environments (see https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md#setting-up-chrome-linux-sandbox)
+  },
 });
 
 client.on("ready", async () => {
-  
+  let streamList = [];
+
   // // create home timeline
   // const home = await client.timelines.fetch({
-  //   type: 'home'
-  // })
+  //   type: 'home',
+  // });
+  // streamList.push(home);
 
   // // create following timeline
   // const following = await client.timelines.fetch({
-  //   type: 'following'
-  // })
+  //   type: 'following',
+  // });
+  // streamList.push(following);
 
   // // create list timeline with id '1239948255787732993'
   // const list = await client.timelines.fetch({
   //   type: 'list',
-  //   id: '1239948255787732993'
-  // })
+  //   id: '1239948255787732993',
+  // });
+  // streamList.push(list);
 
   // create posts timeline without a profile
-  const elonPosts = (await client.timelines.fetch({
-    type: "posts",
-    username: "elonmusk",
-  }));
+  const elonPosts = await client.timelines.fetch({
+    type: 'posts',
+    username: 'elonmusk',
+  });
+  streamList.push(elonPosts);
 
-  // let tweet = await client.tweets.fetch("1825723913051000851")
-
-  // // stream posts timeline
-  // elonPosts.stream({
-  //   minTimeout: 1 * 60 * 1000, // 1 minute
-  //   maxTimeout: 2 * 60 * 1000, // 2 minutes
-  //   catchUp: true,
-  //   minCatchUpTimeout: 10 * 1000, // 10 seconds
-  //   maxCatchUpTimeout: 20 * 1000, // 20 seconds
-  //   maxCatchUpLoops: 5,
-  //   isCatchUpComplete: (tweets) => {
-  //     return false; // rely on maxCatchUpLoops
-  //   },
-  // });
+  // // create tweet and get replies timeline
+  // const tweet = await client.tweets.fetch('1825723913051000851');
+  // const tweetReplies = await tweet.replies;
+  // streamList.push(tweetReplies);
 
   // // stop streaming after 60 seconds
   // setTimeout(() => {
   //   elonPosts.endStream();
-  // }, 1*60*1000);
+  // }, 1 * 60 * 1000);
 
   // // create profile for elon musk
   // const elon = await client.profiles.fetch({
-  //   username: "elonmusk",
+  //   username: 'elonmusk',
   // });
 
   // // create replies timeline through profile
-  // const elonReplies = await elon.timelines.fetch('replies')
+  // const elonReplies = await elon.timelines.fetch('replies');
+  // streamList.push(elonReplies);
 
   // // create media timeline through profile
-  // const elonMedia = await elon.timelines.fetch('media')
+  // const elonMedia = await elon.timelines.fetch('media');
+  // streamList.push(elonMedia);
 
-  // // stream media timeline
-  // elonMedia.stream({
-  //   minTimeout: 1*60*1000,
-  //   maxTimeout: 2*60*1000,
-  //   catchUp: true,
-  //   minCatchUpTimeout: 10*1000,
-  //   maxCatchUpTimeout: 20*1000,
-  //   maxCatchUpLoops: 5
-  // }, async (data) => { // log media urls
-  //   console.log(data.tweets.map( 
-  //     t => t.media?.map(m => m.url).join(" | ") || 'No media found'
-  //   ).join('\n'))
-  // })
+  // // create search timeline
+  // const searchResults = await client.search({
+  //   exactPhrases: ['test'],
+  // });
+  // streamList.push(searchResults);
 
-  
   // stream timelines
-  streamAll([
-    // home,
-    // following,
-    // list,
-    elonPosts,
-    // elonReplies,
-    // elonMedia,
-    // await tweet.replies
-  ])
+  streamAll(streamList);
 });
 
 client.on('timelineCreate', async (timeline) => {
-  console.log('Timeline Created:', timeline.type) // 'list' || 'home' || 'following' || 'posts' || 'replies' || 'media'
-  console.log(timeline.tweets.cache.length, 'tweets cached')
-})
+  console.log('Timeline Created:', timeline.type); // 'home' | 'following' | 'list' | 'posts' | 'media' | 'replies' | 'tweetReplies' | 'search'
+  console.log(timeline.tweets.cache.length, 'tweets cached');
+});
 
 client.on('profileCreate', async (profile) => {
-  console.log('Profile Created:', profile.username)
-})
+  console.log('Profile Created:', profile.username);
+});
 
 function streamAll(timelines: Timeline[]) {
-  timelines.forEach(timeline => {
-
+  timelines.forEach((timeline) => { // stream each timeline and log new tweets
     // manage new tweets
     timeline.on('timelineUpdate', async (tweets: Tweet[]) => {
-      console.log("--------------- NEW TWEETS --------------")
-      console.log(tweets.map(t => `${t.createdAt} - ${t.isRetweet ? t.retweetedTweet?.text : t.text}`).join('\n'))
-      console.log("------------------------------------------")
-    })
+      console.log("--------------- NEW TWEETS --------------");
+      console.log(tweets.map(t => `${t.createdAt} - ${t.isRetweet ? t.retweetedTweet?.text : t.text}`).join("\n"));
+      console.log("------------------------------------------");
+    });
 
     // stream the timeline
     timeline.stream({
-      minTimeout: 1*60*1000,
-      maxTimeout: 2*60*1000,
+      minTimeout: 1 * 60 * 1000,
+      maxTimeout: 2 * 60 * 1000,
       catchUp: true,
-      minCatchUpTimeout: 10*1000,
-      maxCatchUpTimeout: 20*1000,
-      maxCatchUpLoops: 5
-    })
-  })
+      minCatchUpTimeout: 10 * 1000,
+      maxCatchUpTimeout: 20 * 1000,
+      maxCatchUpLoops: 5,
+    });
+  });
 }

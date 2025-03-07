@@ -7,6 +7,7 @@ import { Timeline } from "./Timelines";
 import { ProfileManager } from "./Managers/ProfileManager";
 import { Profile } from "./Profile";
 import { GlobalTweetManager } from "./Managers";
+import { SearchTimelineUrlData } from "./Timelines/SearchTimeline";
 
 export interface ClientParams {
   headless?: boolean;
@@ -45,8 +46,11 @@ export class Client extends EventEmitter<ClientEvents> {
   }
   /**
    * Create a new client
-   * @param headless Whether or not to run the browser in headless mode
    * 
+   * Takes an object with the following optional parameters
+   * @param headless - Run the browser in headless mode || default: true
+   * @param keepPageOpen - Keep the browser open after getting account data || default: false
+   * @param puppeteerSettings - Puppeteer launch settings
    */
   constructor({
     headless = true,
@@ -65,11 +69,6 @@ export class Client extends EventEmitter<ClientEvents> {
       this.rest = new RESTApiManager(this);
       this.emit("ready");
     })
-  }
-
-  // no idea what this was supposed to do 💀
-  async build() {
-    
   }
 
   async getAccountData({
@@ -204,6 +203,158 @@ export class Client extends EventEmitter<ClientEvents> {
       });
     });
   }
+  /**
+   * Search for tweets
+   * @param query - A string or an object with advanced search parameters
+   * @param searchType - The type of search to perform
+   */
+  async search(query: string | AdvancedSearchQuery, searchType: SearchTimelineUrlData["variables"]["product"] = "Latest") {
+    // allWords1 allWords2 "exact phrase 1" "exactPhrase2" (anyWord1 OR anyWord2) (#hashtag1 OR #hashtag2) (from:from1 OR from:from2) (to:to1 OR to:to2) (@mention1 OR @mention2) filter:replies filter:links min_replies:2 min_faves:3 min_retweets:4 until:2025-12-22 since:2006-01-01
+    let isAdvanced = !(typeof query == "string");
+    
+    let rawQuery = isAdvanced ? "" : query as string;
+
+    if (isAdvanced) {
+      let q = query as AdvancedSearchQuery;
+      if (q.allWords) rawQuery += q.allWords.join(" ");
+      if (q.exactPhrases) rawQuery += ` "(${q.exactPhrases.join(" ")})"`;
+      if (q.anyWords) rawQuery += ` (${q.anyWords.join(" OR ")})`;
+      if (q.noneWords) rawQuery += ` ${q.noneWords.map(w => '-'+w).join(" ")})`;
+      if (q.hashtags) rawQuery += ` (${q.hashtags.map(h => '#'+h.replace(/^#/, "")).join(" ")})`;
+      if (q.lang) rawQuery += ` lang:${q.lang.join(" OR lang:")}`;
+      if (q.from) rawQuery += ` from:${q.from.map(u => u.replace(/^@/, "")).join(" OR from:")}`;
+      if (q.to) rawQuery += ` to:${q.to.map(u => u.replace(/^@/, "")).join(" OR to:")}`;
+      if (q.mentions) rawQuery += ` @${q.mentions.map(u => u.replace(/^@/, "")).join(" OR @")}`;
+      if (q.repliesOnly) rawQuery += ` filter:replies`;
+      if (q.linksOnly) rawQuery += ` filter:links`;
+      if (q.minReplies) rawQuery += ` min_replies:${q.minReplies}`;
+      if (q.minFavorites) rawQuery += ` min_faves:${q.minFavorites}`;
+      if (q.minRetweets) rawQuery += ` min_retweets:${q.minRetweets}`;
+      if (q.since) rawQuery += ` since:${q.since}`;
+      if (q.until) rawQuery += ` until:${q.until}`;
+    }
+
+    const timeline = await this.timelines.fetch({
+      type: "search",
+      query: rawQuery,
+      product: searchType,
+      querySource: isAdvanced ? "advanced_search_page" : "typed_query",
+    })
+
+    return timeline;
+  }
+}
+
+export interface AdvancedSearchQuery {
+  /**
+   * Match all of these words (fuzzy search)
+   */
+  allWords?: string[]
+  /**
+   * Match these exact phrases
+   */
+  exactPhrases?: string[]
+  /**
+   * Match any of these words
+   */
+  anyWords?: string[]
+  /**
+   * Don't match any of these words
+   */
+  noneWords?: string[]
+  /**
+   * Match these hashtags
+   */
+  hashtags?: string[]
+  /**
+   * Match these languages
+   * 
+   * - "ar" - Arabic  
+   * - "ar-x-fm" - Arabic (Feminine)  
+   * - "bn" - Bangla  
+   * - "eu" - Basque  
+   * - "bg" - Bulgarian  
+   * - "ca" - Catalan  
+   * - "hr" - Croatian  
+   * - "cs" - Czech  
+   * - "da" - Danish  
+   * - "nl" - Dutch  
+   * - "en" - English  
+   * - "fi" - Finnish  
+   * - "fr" - French  
+   * - "de" - German  
+   * - "el" - Greek  
+   * - "gu" - Gujarati  
+   * - "he" - Hebrew  
+   * - "hi" - Hindi  
+   * - "hu" - Hungarian  
+   * - "id" - Indonesian  
+   * - "it" - Italian  
+   * - "ja" - Japanese  
+   * - "kn" - Kannada  
+   * - "ko" - Korean  
+   * - "mr" - Marathi  
+   * - "no" - Norwegian  
+   * - "fa" - Persian  
+   * - "pl" - Polish  
+   * - "pt" - Portuguese  
+   * - "ro" - Romanian  
+   * - "ru" - Russian  
+   * - "sr" - Serbian  
+   * - "zh-cn" - Simplified Chinese  
+   * - "sk" - Slovak  
+   * - "es" - Spanish  
+   * - "sv" - Swedish  
+   * - "ta" - Tamil  
+   * - "th" - Thai  
+   * - "zh-tw" - Traditional Chinese  
+   * - "tr" - Turkish  
+   * - "uk" - Ukrainian  
+   * - "ur" - Urdu  
+   * - "vi" - Vietnamese  
+   */
+  lang?: ("ar" | "ar-x-fm" | "bn" | "eu" | "bg" | "ca" | "hr" | "cs" | "da" | "nl" | "en" | "fi" | "fr" | "de" | "el" | "gu" | "he" | "hi" | "hu" | "id" | "it" | "ja" | "kn" | "ko" | "mr" | "no" | "fa" | "pl" | "pt" | "ro" | "ru" | "sr" | "zh-cn" | "sk" | "es" | "sv" | "ta" | "th" | "zh-tw" | "tr" | "uk" | "ur" | "vi")[]
+  /**
+   * Match posts from these usernames
+   */
+  from?: string[]
+  /**
+   * Match posts to these usernames (replies)
+   */
+  to?: string[]
+  /**
+   * Match posts mentioning these usernames
+   */
+  mentions?: string[]
+  /**
+   * Only return replies
+   */
+  repliesOnly?: boolean
+  /**
+   * Only return tweets with links
+   */
+  linksOnly?: boolean
+  /**
+   * Minimum number of replies
+   */
+  minReplies?: number
+  /**
+   * Minimum number of favorites
+   */
+  minFavorites?: number
+  /**
+   * Minimum number of retweets
+   */
+  minRetweets?: number
+  /**
+   * Earlies date to search from (YYYY-MM-DD)
+   */
+  since?: string
+  /**
+   * Latest date to search until (YYYY-MM-DD)
+   */
+  until?: string
+  
 }
 
 export type FeaturesGetData<T extends string[]> = Record<T[number], boolean | string | number | any[]> & {

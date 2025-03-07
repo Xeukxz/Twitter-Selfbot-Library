@@ -10,8 +10,9 @@ import { MediaTimeline, MediaTimelineData, RawMediaAddToModuleTimelineResponseDa
 import { RawRepliesTimelineResponseData, RepliesTimeline, RepliesTimelineData } from "./ProfileTimelines/RepliesTimeline"
 import { EventEmitter } from "events"
 import { RawTweetRepliesTimelineResponseData, TweetRepliesTimeline } from "./TweetRepliesTimeline"
+import { RawSearchTimelineResponseData, SearchTimeline, SearchTimelineData } from "./SearchTimeline";
 
-export type TimelineData = HomeTimelineData | FollowingTimelineData | ListTimelineData | PostsTimelineData | MediaTimelineData | RepliesTimelineData
+export type TimelineData = HomeTimelineData | FollowingTimelineData | ListTimelineData | PostsTimelineData | MediaTimelineData | RepliesTimelineData | SearchTimelineData
 
 
 export interface TimelineEvents<T extends TweetEntryTypes> {
@@ -53,8 +54,14 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
     }
   }
 
+  /**
+   * Fetches the latest tweets from the timeline
+   */
   abstract fetchLatest(): Promise<TimelineTweetReturnData>
 
+  /**
+   * Fetches older tweets from the timeline
+   */
   abstract scroll(): Promise<TimelineTweetReturnData>
 
   resetVariables() {
@@ -301,9 +308,9 @@ export interface BaseTimelineUrlData {
   // };
 }
 
-export type TimelineTypes = 'home' | 'following' | 'list' | 'posts' | 'media' | 'replies' | 'tweetReplies' // | 'likes' | 'highlights'
+export type TimelineTypes = 'home' | 'following' | 'list' | 'posts' | 'media' | 'replies' | 'tweetReplies' | 'search' // | 'likes' | 'highlights'
 
-export type Timeline = ListTimeline | HomeTimeline | FollowingTimeline | PostsTimeline | MediaTimeline | RepliesTimeline | TweetRepliesTimeline
+export type Timeline = ListTimeline | HomeTimeline | FollowingTimeline | PostsTimeline | MediaTimeline | RepliesTimeline | TweetRepliesTimeline | SearchTimeline
 
 export type TimelineTweetEntryData<T> = [...T[], Cursor, Cursor]
 
@@ -334,7 +341,7 @@ export interface BottomCursorData extends CursorData {
 
 export type Cursor = TopCursorData | BottomCursorData
 
-export type RawTimelineResponseData = RawListTimelineResponseData | RawHomeTimelineResponseData | RawFollowingTimelineResponseData | RawPostsTimelineResponseData | RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData | RawRepliesTimelineResponseData | RawTweetRepliesTimelineResponseData
+export type RawTimelineResponseData = RawListTimelineResponseData | RawHomeTimelineResponseData | RawFollowingTimelineResponseData | RawPostsTimelineResponseData | RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData | RawRepliesTimelineResponseData | RawTweetRepliesTimelineResponseData | RawSearchTimelineResponseData
 
 
 export interface NewListTimelineData {
@@ -395,4 +402,10 @@ export interface TimelinePinEntry {
 export interface TimelineTerminateTimeline {
   type: "TimelineTerminateTimeline";
   direction: string;
+}
+
+export interface TimelineReplaceEntry {
+  type: "TimelineReplaceEntry";
+  entry_id_to_replace: string;
+  entry: Cursor;
 }

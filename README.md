@@ -12,13 +12,12 @@
 ### Initialising the client:
 **Parameters:**
 - `headless` - Boolean (Optional) - Defaults to true.
+- `puppeteerSettings` - [PuppeteerLaunchOptions](https://github.com/puppeteer/puppeteer/blob/main/docs/api/puppeteer.launchoptions.md) (Optional)
 ```ts
 const client = new Client({
   headless: true, // If the puppeteer browser should be visible or not.
   puppeteerSettings: { // Puppeteer launch settings
-
     // args: ['--no-sandbox', '--disable-setuid-sandbox'], // for some linux environments (see https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md#setting-up-chrome-linux-sandbox)
-  
   },
 })
 ```
@@ -31,8 +30,6 @@ Once you are logged into the account on the puppeteer browser, the account data 
 ### Initialising Timelines:
 Once the client emits the `ready` event, you can then create new timeline instances.
 ```ts
-import { HomeTimeline, FollowingTimeline, ListTimeline, PostsTimeline, MediaTimeline, RepliesTimeline, } from "../src";
-
 client.on('ready', async () => {
 
   // create home timeline instance
@@ -71,22 +68,31 @@ client.on('ready', async () => {
   // create tweet and get replies timeline
   const tweet = await client.tweets.fetch("1825723913051000851")
   const tweetReplies = tweet.replies
+  
+  // create search timeline
+  const searchResults = await client.search({
+    exactPhrases: ['test'],
+  });
 })
 ```
+Each timeline is created via `<Client>.timelines.fetch()` which requires an object with a `type` parameter (see below for all available types).  
+Some timelines may require additional properties (also listed below)
+> [!NOTE]
+> Each profile timeline requires a `username` property unless created via `<Profile>.timelines.fetch()`
 ### The current available timelines are:
 - **Base:**
   - `home` - The main "For You" timeline
   - `following` - The "Following" timeline
   - `list` - The timeline of a Twitter list
     - Requires an `id` property
+  - `search` - The timeline for a search query
+    - You should use `<Client>.search()` for this
 - **Tweet:**
   - `tweetReplies` - The replies timeline of a tweet
 - **Profile:**
   - `posts` - The posts timeline of a user
   - `replies` - The replies timeline of a user
   - `media` - The media timeline of a user
-
-**Note**: Each profile timeline requires a `username` property unless created via `<Profile>.timelines.fetch()`
 
 ## Streaming Timelines:
 
@@ -149,7 +155,7 @@ If you would like to implement your own streaming functionality you can use the 
 - `.fetchLatest()` - fetches the latest tweets
 - `.scroll()` - fetches earlier tweets
 
-each method returns the following structure:
+Each method returns the following structure:
   
   ```ts
   {
@@ -158,14 +164,14 @@ each method returns the following structure:
   }
   ```
 
-### Extra tools
+## Extra tools
 
 Once a timeline is initialised via `timelines.fetch()`, it emits a `timelineCreate` event. The same goes for profiles.
 ```ts
 import { Timeline, Profile } from "../src";
 
 client.on('timelineCreate', async (timeline: Timeline) => {
-  console.log('Timeline Created:', timeline.type) // 'list' || 'home' || 'following' || 'posts' || 'replies' || 'media'
+  console.log('Timeline Created:', timeline.type) // 'home' | 'following' | 'list' | 'posts' | 'media' | 'replies' | 'tweetReplies' | 'search'
   console.log(timeline.tweets.cache.length, 'tweets cached')
 })
 
@@ -174,5 +180,5 @@ client.on('profileCreate', async (profile: Profile) => {
 })
 ```
 
-### Examples:
+## Examples:
 An example can be found in the `./example` directory.
