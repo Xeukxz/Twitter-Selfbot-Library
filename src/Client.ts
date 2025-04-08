@@ -42,7 +42,7 @@ export class Client extends EventEmitter<ClientEvents> {
     impressions: {},
     keysRead: {},
     settingsVersion: string,
-    get: <T extends string[]>(keys: string[]) => FeaturesGetData<T>
+    get: <T extends string[]>(keys: T) => FeaturesGetData<T>
   }
   /**
    * Create a new client
@@ -133,16 +133,25 @@ export class Client extends EventEmitter<ClientEvents> {
       await page.goto("https://twitter.com/home");
 
       const html = await page.content();
+
+      // parse the html to match the window.__INITIAL_STATE__ declaration
+      const InitialStateObjectString = html.match(/window\.__INITIAL_STATE__=({.*?});/)?.[1] || '';
+      const __INITIAL_STATE__ = JSON.parse(InitialStateObjectString)
+      let featureSwitches = __INITIAL_STATE__?.["featureSwitch"]?.["user"] || {}
       
-      let featuresString = `${html.match(/"user":\{"config".+?,"debug"/)![0].replace(`,"debug"`, "").replace(`"user":`, "")}`
+      if(Object.keys(featureSwitches as Object).length === 0) console.warn("\x1b[33mWARNING: Failed to parse feature switches from DOM. All values will default to true.\x1b[0m")
       this.features = {
-        ...JSON.parse(featuresString),
-        get: <T extends string[]>(keys: string[]): FeaturesGetData<T> => { //  jesus fucking christ
+        ...featureSwitches,
+        get: <T extends string[]>(keys: T): FeaturesGetData<T> => {
           // console.log(keys)
           // console.log(this.features.config)
           // console.log(keys.map(key => [key, this.features.config[key]?.value]))
+          const entries = keys.map(key => [
+            key,
+            this.features.config?.[key]?.value ?? (this.debug && console.warn(`\x1b[33mWARNING: Key ${key} not found in features.config. Defaulting to true.\x1b[0m`), true)
+          ]);
           return {
-            ...Object.fromEntries(keys.map(key => [key, this.features.config[key].value])),
+            ...Object.fromEntries(entries),
             URIEncoded: function() {
               return encodeURIComponent(JSON.stringify(this))
             }
