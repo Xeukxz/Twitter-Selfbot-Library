@@ -93,14 +93,19 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
         variables: this.variables
       }).then(async (res) => {
         this.cache.push(res.data)
-        let fetchedTweets = await this.buildTweetsFromCache(res.data)
+        let fetchedTweets = await this.buildTweetsFromCache(res.data).catch(err => {
+          console.error(`Error building tweets from ${this.type} timeline`)
+          console.error(this.client.rest._trace.summary())
+          if(err.response?.data) console.error(err.response.data)
+          reject(err)
+        }) as Tweet[]
         resolve({
           tweets: fetchedTweets,
           rawData: res.data
         })
       }).catch((err) => {
         console.error(`Error fetching ${this.type} timeline`)
-        console.error(this.client.rest._trace)
+        console.error(this.client.rest._trace.summary())
         if(err.response?.data) console.error(err.response.data)
         reject(err)
       })

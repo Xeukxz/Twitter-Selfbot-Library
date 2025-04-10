@@ -33,8 +33,11 @@ export class RESTApiManager {
     url: 'undefined',
     time: 0,
     status: 'undefined',
-    summary: function() {
-      return `Trace: ${this.url}\nTime: ${this.time > 0 ? new Date(this.time).toLocaleString() + `${this.time}` : 'undefined'}\nStatus: ${this.status}`;
+    summary: () => {
+      return `\n\x1b[1m[TRACE]\x1b[0m\n`
+           + `Time: \x1b[90m${this._trace.time > 0 ? new Date(this._trace.time).toLocaleString() + `${this._trace.time}` : 'undefined'}\x1b[0m\n`
+           + `Status: \x1b[90m${this._trace.status}\x1b[0m\n`
+           + `curl: \x1b[90mcurl -X GET "${this._trace.url}" ${Object.entries(this.headers).map(([key, value]) => `-H "${key}: ${value}"`).join(' ')}\x1b[0m`
     }
   };
   constructor(client: Client) {
