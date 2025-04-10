@@ -9,7 +9,7 @@ const client = new Client({
 });
 
 client.on("ready", async () => {
-  let streamList = [];
+  let streamList: Timeline[] = [];
 
   // // create home timeline
   // const home = await client.timelines.fetch({
@@ -26,21 +26,21 @@ client.on("ready", async () => {
   // // create list timeline with id '1239948255787732993'
   // const list = await client.timelines.fetch({
   //   type: 'list',
-  //   id: '1239948255787732993',
+  //   id: '1632543657965363200',
   // });
   // streamList.push(list);
-
+  
+  // // create tweet and get replies timeline
+  // const tweet = await client.tweets.fetch('1825723913051000851');
+  // const tweetReplies = await tweet.replies;
+  // streamList.push(tweetReplies);
+  
   // create posts timeline without a profile
   const elonPosts = await client.timelines.fetch({
     type: 'posts',
     username: 'elonmusk',
   });
   streamList.push(elonPosts);
-
-  // // create tweet and get replies timeline
-  // const tweet = await client.tweets.fetch('1825723913051000851');
-  // const tweetReplies = await tweet.replies;
-  // streamList.push(tweetReplies);
 
   // // stop streaming after 60 seconds
   // setTimeout(() => {
@@ -86,6 +86,7 @@ function streamAll(timelines: Timeline[]) {
       console.log("--------------- NEW TWEETS --------------");
       console.log(tweets.map(t => `${t.createdAt} - ${t.isRetweet ? t.retweetedTweet?.text : t.text}`).join("\n"));
       console.log("------------------------------------------");
+      console.log(`${client.timelines.cache.reduce((acc, timeline) => acc + timeline.tweets.cache.length, 0)} total tweets cached`);
     });
 
     // stream the timeline
