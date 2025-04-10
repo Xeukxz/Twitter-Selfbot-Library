@@ -65,7 +65,6 @@ export class Client extends EventEmitter<ClientEvents> {
       keepPageOpen,
       puppeteerSettings
     }).then(() => {
-      // console.log("Got account data.");
       this.rest = new RESTApiManager(this);
       this.emit("ready");
     })
@@ -103,16 +102,13 @@ export class Client extends EventEmitter<ClientEvents> {
       }
       
       // Launch the browser and open a new blank page
-      if(this.debug) console.log(headless ? "Running in headless mode." : "Running in non-headless mode.")
-      if(this.debug) console.log(keepPageOpen ? "Keeping browser open after getting account data." : "Closing browser after getting account data.")
       const browser = await puppeteer.launch({
         headless: headless,
         ...puppeteerSettings
       });
 
       browser.on('disconnected', async () => {
-        if(parsedStoredData?.cookies) this.debug ? console.log('Browser has been disconnected, The client will continue running.') : null;
-        else {
+        if(!parsedStoredData?.cookies) {
           await browser.close();
           browser.process()?.kill()
           throw new Error('Account data not found.')
@@ -120,6 +116,7 @@ export class Client extends EventEmitter<ClientEvents> {
       });
       
       const page = await browser.newPage();
+      page.setDefaultNavigationTimeout(0)
       // if stored data is an empty object
       if (Object.keys(parsedStoredData?.cookies ?? parsedStoredData)?.length > 0)
         await page.setCookie(...parsedStoredData.cookies);
@@ -128,27 +125,82 @@ export class Client extends EventEmitter<ClientEvents> {
         console.log("Please login to the account you wish to automate.");
       }
 
+      // Set screen size
+      if (!headless) await page.setViewport({ width: 1080, height: 1024 });
+
+      let gotCredentials = false;
+      let gotFeatureSwitches = false;
+
+      const checkDataFetched = async () => {
+        if (!(gotCredentials && gotFeatureSwitches)) return;
+        try {
+          if (!keepPageOpen && browser.connected) {
+            if(!page.isClosed()) await page.close()
+            await browser.close();
+          }
+
+        } catch (e) {
+          if (this.debug) console.error(e);
+        }
+        resolve();
+      }
+
+      page.on("request", async (request) => {
+        let headers = request.headers();
+        let guestToken = headers[`authorization`];
+        let csrftoken = headers[`x-csrf-token`];
+        if (guestToken && csrftoken) {
+          page.off("request");
+          page.off("response");
+          let cookies = await page.cookies();
+          let cookiesString = cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
+          parsedStoredData = {
+            Authorisation: guestToken,
+            "x-csrf-token": csrftoken,
+            cookies: cookies,
+            cookiesString: cookiesString,
+          };
+          fs.writeFileSync(`${__dirname}/../accountData.json`, JSON.stringify(parsedStoredData, null, 2));
+          this.token = guestToken;
+          this.csrfToken = csrftoken;
+          this.cookies = cookiesString;
+          gotCredentials = true;
+          checkDataFetched()
+        }
+      });
+      
+      let addedTrailingNewline = false;
+      if(this.debug) {
+        let totalBytesReceived = 0
+        const addAndWrite = (bytes: number) => {
+          if (gotCredentials) return addedTrailingNewline ? void 0 : process.stdout.write("\n"), addedTrailingNewline = true;
+          totalBytesReceived += bytes;
+          const formatted = totalBytesReceived > 1048576 
+            ? `${(totalBytesReceived / 1048576).toFixed(2)} MB` 
+            : `${(totalBytesReceived / 1024).toFixed(2)} KB`;
+          process.stdout.write(`\rTransfer: ${formatted}  `);
+        }
+        
+        page.on('response', async (response, header = response.headers()['content-length']) => 
+          addAndWrite(header ? parseInt(header, 10) : await response.buffer().catch(() => null).then((b) => b ? b.length : 0)));
+      }
 
       // Navigate the page to a URL
-      await page.goto("https://twitter.com/home");
-
-      const html = await page.content();
-
+      await page.goto("https://twitter.com/home")
+      
       // parse the html to match the window.__INITIAL_STATE__ declaration
+      const html = await page.content();
       const InitialStateObjectString = html.match(/window\.__INITIAL_STATE__=({.*?});/)?.[1] || '';
       const __INITIAL_STATE__ = JSON.parse(InitialStateObjectString)
       let featureSwitches = __INITIAL_STATE__?.["featureSwitch"]?.["user"] || {}
-      
-      if(Object.keys(featureSwitches as Object).length === 0) console.warn("\x1b[33mWARNING: Failed to parse feature switches from DOM. All values will default to true.\x1b[0m")
+
+      if(Object.keys(featureSwitches as Object).length === 0) console.warn("\n\x1b[33mWARNING: Failed to parse feature switches from DOM. All values will default to true.\x1b[0m"), addedTrailingNewline = true;
       this.features = {
         ...featureSwitches,
         get: <T extends string[]>(keys: T): FeaturesGetData<T> => {
-          // console.log(keys)
-          // console.log(this.features.config)
-          // console.log(keys.map(key => [key, this.features.config[key]?.value]))
           const entries = keys.map(key => [
             key,
-            this.features.config?.[key]?.value ?? (this.debug && console.warn(`\x1b[33mWARNING: Key ${key} not found in features.config. Defaulting to true.\x1b[0m`), true)
+            this.features.config?.[key]?.value ?? (this.debug && console.warn(`\x1b[33mWARNING: Feature Switch ${key} is missing. Defaulting to true.\x1b[0m`), true)
           ]);
           return {
             ...Object.fromEntries(entries),
@@ -158,58 +210,9 @@ export class Client extends EventEmitter<ClientEvents> {
           } as FeaturesGetData<T>;
         }
       }
+      gotFeatureSwitches = true;
+      checkDataFetched()
 
-      // Set screen size
-      if (!headless) await page.setViewport({ width: 1080, height: 1024 });
-
-      let gotData = false;
-
-      page.on("request", async (request) => {
-        if (gotData) return;
-        // console.log(request.url());
-        let headers = request.headers();
-        // find the request with the authorization header
-        let token = headers[`authorization`];
-        let csrftoken = headers[`x-csrf-token`];
-        // if(csrftoken) console.log(headers)
-        // console.log(token, csrftoken);
-        if (token && csrftoken) {
-          gotData = true;
-          // console.log(token);
-          let cookies = await page.cookies();
-          let cookiesString = cookies
-            .map((cookie) => `${cookie.name}=${cookie.value}`)
-            .join("; ");
-          parsedStoredData = {
-            Authorisation: token,
-            "x-csrf-token": csrftoken,
-            cookies: cookies,
-            cookiesString: cookiesString,
-          };
-          fs.writeFileSync(
-            `${__dirname}/../accountData.json`,
-            JSON.stringify(parsedStoredData, null, 2)
-          );
-          // fs.writeFileSync('cookies.json', JSON.stringify(cookies))
-          // console.log(cookies, cookiesString);
-          page.off("request");
-          if(this.debug) console.log(
-            `Got account data. ${
-              keepPageOpen ? "Keeping browser open." : "Closing browser."
-            }`
-          );
-          if (!keepPageOpen) {
-            if(this.debug) console.log("Closing browser.");
-            if(!page.isClosed()) await page.close()
-            await browser.close();
-            if(this.debug) console.log("Browser closed.");
-          }
-          this.token = token;
-          this.csrfToken = csrftoken;
-          this.cookies = cookiesString;
-          resolve();
-        }
-      });
     });
   }
   /**
