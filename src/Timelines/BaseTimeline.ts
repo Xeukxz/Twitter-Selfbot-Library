@@ -21,7 +21,6 @@ export interface TimelineEvents<T extends TweetEntryTypes> {
 
 export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitter<TimelineEvents<T>> {
   client: Client
-  // abstract tweets: TweetManager<T>
   tweets: TimelineTweetManager<T>
   type!: TimelineTypes
   abstract cache: RawTimelineResponseData[]
@@ -70,7 +69,7 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
   }
 
   /**
-   * effectively creates a new timeline
+   * Effectively creates a new timeline
    */
   async refresh() {
     this.tweets = new TimelineTweetManager(this.client)
@@ -128,12 +127,12 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
     isCatchUpComplete = () => false,
   } : {
     /**
-     * The minimum timeout interval in milliseconds before fetching the timeline again (default 5s)
+     * The minimum timeout interval in milliseconds before fetching the timeline again (default 5m)
      */
     minTimeout?: number,
 
     /**
-     * The maximum timeout interval in milliseconds before fetching the timeline again (default 10s)
+     * The maximum timeout interval in milliseconds before fetching the timeline again (default 10m)
      */
     maxTimeout?: number,
 
@@ -212,7 +211,7 @@ export abstract class BaseTimeline<T extends TweetEntryTypes> extends EventEmitt
   }
 
   /**
-   * Catches up on the timeline by scrolling until a condition is met
+   * Catches up on the timeline by scrolling until a condition is met or a maximum number of loops is reached
    * 
    * It is recommended to use `timeline.stream({ catchUp: true })` instead of this method unless you need the extra control
    * 
@@ -308,9 +307,6 @@ export interface BaseTimelineUrlData {
     URIEncoded: () => string;
   };
   features: FeaturesGetData<Queries['metadata']['featureSwitches']>
-  //   // responsive_web_home_pinned_timelines_enabled: boolean, // list only ?? legit not even
-  //   URIEncoded: () => string;
-  // };
 }
 
 export type TimelineTypes = 'home' | 'following' | 'list' | 'posts' | 'media' | 'replies' | 'tweetReplies' | 'search' // | 'likes' | 'highlights'
@@ -347,7 +343,6 @@ export interface BottomCursorData extends CursorData {
 export type Cursor = TopCursorData | BottomCursorData
 
 export type RawTimelineResponseData = RawListTimelineResponseData | RawHomeTimelineResponseData | RawFollowingTimelineResponseData | RawPostsTimelineResponseData | RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData | RawRepliesTimelineResponseData | RawTweetRepliesTimelineResponseData | RawSearchTimelineResponseData
-
 
 export interface NewListTimelineData {
   type: 'list'

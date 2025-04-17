@@ -39,10 +39,6 @@ export class PostsTimeline extends BaseTimeline<RawTweetEntryData> {
     this.profileUsername = data.username;
   }
 
-  /**
-   * Fetches the latest tweets from the timeline
-   * @returns RawListTimelineData[]
-   */
   async fetchLatest() {
     this.variables.cursor = this.cursors.top;
     this.variables.count = 40;
@@ -56,10 +52,6 @@ export class PostsTimeline extends BaseTimeline<RawTweetEntryData> {
     };
   }
 
-  /**
-   * Fetches older tweets from the timeline
-   * @returns RawListTimelineData[]
-   */
   async scroll() {
     this.variables.cursor = this.cursors.bottom;
     this.variables.count = 40;
@@ -89,7 +81,6 @@ export class PostsTimeline extends BaseTimeline<RawTweetEntryData> {
 
   async buildTweetsFromCache(data: RawPostsTimelineResponseData) {
     return new Promise<Tweet<RawTweetEntryData>[]>((resolve, reject) => {
-      // console.log(data.data.list.tweets_timeline)
       if (this.client.debug)
         fs.writeFileSync(
           `${__dirname}/../../../debug/debug-posts.json`,
@@ -105,7 +96,6 @@ export class PostsTimeline extends BaseTimeline<RawTweetEntryData> {
         ...this.tweets.addTweets([pinnedTweet]),
         ...tweets
       ];
-      // console.log(t)
       resolve(tweets);
     });
   }

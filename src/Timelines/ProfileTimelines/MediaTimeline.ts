@@ -43,10 +43,6 @@ export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
     this.profileUsername = data.username;
   }
 
-  /**
-   * Fetches the latest tweets from the timeline
-   * @returns RawListTimelineData[]
-   */
   async fetchLatest() {
     this.variables.cursor = this.cursors.top
     this.variables.count = 40;
@@ -61,10 +57,6 @@ export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
     };
   }
 
-  /**
-   * Fetches older tweets from the timeline
-   * @returns RawListTimelineData[]
-   */
   async scroll() {
     this.variables.cursor = this.cursors.bottom
     this.variables.count = 40;

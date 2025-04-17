@@ -58,10 +58,8 @@ export class RESTApiManager {
 
   get(url: string, noAuth: boolean = false): Promise<AxiosResponse> {
     return new Promise((resolve, reject) => {
-      // console.log(`GET ${url}`)
       let headers: any = this.headers;
       if(noAuth) delete headers.Authorization;
-      // console.log(headers)
       Axios({
         method: 'get',
         url: url,
@@ -76,7 +74,6 @@ export class RESTApiManager {
 
   post(url: string, data: any): Promise<AxiosResponse> {
     return new Promise((resolve, reject) => {
-      // console.log(`POST ${url}`)
       Axios({
         method: 'post',
         url: url,

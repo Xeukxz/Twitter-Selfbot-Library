@@ -27,8 +27,6 @@ export interface SearchTimelineData {
 }
 
 export class SearchTimeline extends BaseTimeline<RawTweetEntryData> {
-  // variables: ProfileTimelineUrlData['variables']
-  // features: ProfileTimelineUrlData['features']
   cache: RawSearchTimelineResponseData[] = [];
   variables: SearchTimelineUrlData["variables"] = {
     rawQuery: "",
@@ -45,12 +43,6 @@ export class SearchTimeline extends BaseTimeline<RawTweetEntryData> {
     this.variables.querySource = data.querySource ?? "typed_query";
     this.variables.product = data.product as SearchTimelineUrlData["variables"]["product"] ?? "Latest";
   }
-
-  // get features(): SearchTimelineUrlData['features'] {
-  //   return {
-  //     ...super.features
-  //   }
-  // }
 
   async fetchLatest() {
     this.variables.cursor = this.cursors.top;
@@ -96,7 +88,7 @@ export class SearchTimeline extends BaseTimeline<RawTweetEntryData> {
 
     if (topCursor) this.cursors.top = topCursor?.content.value;
     if (bottomCursor) this.cursors.bottom = bottomCursor?.content.value;
-    
+
     let replaceEntries = instructions.filter(e => e.type == "TimelineReplaceEntry") as TimelineReplaceEntry[];
     replaceEntries.forEach(e => {
       if (e.entry.entryId.startsWith("cursor")) {

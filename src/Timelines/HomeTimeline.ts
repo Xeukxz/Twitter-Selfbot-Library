@@ -24,10 +24,6 @@ export class HomeTimeline extends BaseTimeline<RawTweetEntryData> {
 
   }
 
-  /**
-   * Fetches the latest tweets from the timeline
-   * @returns RawListTimelineData[]
-   */
   async fetchLatest() {
     this.variables.cursor = this.cursors.top;
     this.variables.count = 40;
@@ -41,10 +37,6 @@ export class HomeTimeline extends BaseTimeline<RawTweetEntryData> {
     };
   }
 
-  /**
-   * Fetches older tweets from the timeline
-   * @returns RawListTimelineData[]
-   */
   async scroll() {
     this.variables.cursor = this.cursors.bottom;
     this.variables.count = 40;
@@ -60,12 +52,10 @@ export class HomeTimeline extends BaseTimeline<RawTweetEntryData> {
 
   buildTweetsFromCache(data: RawHomeTimelineResponseData) {
     return new Promise<Tweet<RawTweetEntryData>[]>((resolve, reject) => {
-      // console.log(data.data.list.tweets_timeline)
       if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-home.json`, JSON.stringify(data, null, 2));
       let tweets = this.tweets.addTweets(
         (data.data.home.home_timeline_urt.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>)!.entries as RawTweetEntryData[]
       ) as Tweet<RawTweetEntryData>[];
-      // console.log(t)
       resolve(tweets);
     });
   }

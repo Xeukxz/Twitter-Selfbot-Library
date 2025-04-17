@@ -21,8 +21,6 @@ export interface RepliesTimelineData {
 }
 
 export class RepliesTimeline extends BaseTimeline<RawTweetEntryData | RawProfileConversationEntryData> {
-  // variables: ProfileTimelineUrlData['variables']
-  // features: ProfileTimelineUrlData['features']
   profile!: Profile;
   cache: RawRepliesTimelineResponseData[] = [];
   private profileUsername: string;
@@ -42,16 +40,6 @@ export class RepliesTimeline extends BaseTimeline<RawTweetEntryData | RawProfile
     this.profileUsername = data.username;
   }
 
-  // get features(): RepliesTimelineUrlData['features'] {
-  //   return {
-  //     ...super.features
-  //   }
-  // }
-
-  /**
-   * Fetches the latest tweets from the timeline
-   * @returns RawListTimelineData[]
-   */
   async fetchLatest() {
     this.variables.cursor = this.cursors.top;
     this.variables.count = 40;
@@ -65,10 +53,6 @@ export class RepliesTimeline extends BaseTimeline<RawTweetEntryData | RawProfile
     };
   }
 
-  /**
-   * Fetches older tweets from the timeline
-   * @returns RawListTimelineData[]
-   */
   async scroll() {
     this.variables.cursor = this.cursors.bottom;
     this.variables.count = 40;
@@ -98,7 +82,6 @@ export class RepliesTimeline extends BaseTimeline<RawTweetEntryData | RawProfile
 
   async buildTweetsFromCache(data: RawRepliesTimelineResponseData) {
     return new Promise<Tweet<RawTweetEntryData>[]>((resolve, reject) => {
-      // console.log(data.data.list.tweets_timeline)
       if (this.client.debug)
         fs.writeFileSync(
           `${__dirname}/../../../debug/debug-replies.json`,
@@ -114,7 +97,6 @@ export class RepliesTimeline extends BaseTimeline<RawTweetEntryData | RawProfile
         ...this.tweets.addTweets([pinnedTweet]),
         ...tweets
       ];
-      // console.log(t)
       resolve(tweets);
     });
   }
