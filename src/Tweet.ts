@@ -146,11 +146,33 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
             bitrate: media.bitrate,
             url: media.url,
           };
-        }) 
+        })
       } : {
         type: "image",
         url: m.media_url_https
       });  
+    }
+
+    const cardValues = tweetData.card?.legacy?.binding_values
+    const videoCard = (cardValues as VideoCardBindingValues)?.find(v => v.key == 'unified_card' && v.value.string_value);
+    const imageCard = (cardValues as ImageCardBindingValues)?.find(v => v.key == 'photo_image_full_size_large' && v.value.image_value);
+    if(videoCard) {
+      const cardData = JSON.parse(videoCard.value.string_value) as unifiedCardKeyData;
+      const mediaKey = cardData.component_objects.media_1.data.id;
+      this.media = [{
+        type: "video",
+        variants: cardData.media_entities[mediaKey].video_info.variants.filter(m => !m.url.includes("m3u8")).map((media) => {
+          return {
+            bitrate: media.bitrate || 0,
+            url: media.url,
+          };
+        })
+      }]
+    } else if(imageCard) {
+      this.media = [{
+        type: "image",
+        url: imageCard.value.image_value.url
+      }];
     }
 
     this.text = (tweetData as RawProfileConversationTweetData).note_tweet?.note_tweet_results?.result.text ?? (this.retweetedTweet?.text ?? tweetData.legacy.full_text);
@@ -176,68 +198,71 @@ export interface RawProfileConversationTweetResult {
   }
   tweetDisplayType?: string;
 }
+
+export interface RawUserResults {
+  result: {
+    __typename: string;
+    id: string;
+    rest_id: string;
+    affiliates_highlighted_label: {};
+    has_graduated_access: boolean;
+    is_blue_verified: boolean;
+    legacy: {
+      can_dm: boolean;
+      can_media_tag: boolean;
+      created_at: string;
+      default_profile: boolean;
+      default_profile_image: boolean;
+      description: string;
+      entities: {
+        description: {
+          urls: {
+            display_url: string,
+            expanded_url: string,
+            url: string,
+            indices: [ number, number ]
+          }[];
+        };
+        url: {
+          urls: {
+            display_url: string;
+            expanded_url: string;
+            url: string;
+            indices: [number, number];
+          }[];
+        };
+      };
+      fast_followers_count: number;
+      favourites_count: number;
+      followers_count: number;
+      friends_count: number;
+      has_custom_timelines: boolean;
+      is_translator: boolean;
+      listed_count: number;
+      location: string;
+      media_count: number;
+      name: string;
+      normal_followers_count: number;
+      pinned_tweet_ids_str: string[];
+      possibly_sensitive: boolean;
+      profile_banner_url: string;
+      profile_image_url_https: string;
+      profile_interstitial_type: string;
+      screen_name: string;
+      statuses_count: number;
+      translator_type: string;
+      url?: string;
+      verified: boolean;
+      want_retweets: boolean;
+      withheld_in_countries: unknown[];
+    };
+  };
+}
+
 export interface RawTweetData {
   rest_id: string;
   core: {
-    user_results: {
-      result: {
-        __typename: string;
-        id: string;
-        rest_id: string;
-        affiliates_highlighted_label: {};
-        has_graduated_access: boolean;
-        is_blue_verified: boolean;
-        legacy: {
-          can_dm: boolean;
-          can_media_tag: boolean;
-          created_at: string;
-          default_profile: boolean;
-          default_profile_image: boolean;
-          description: string;
-          entities: {
-            description: {
-              urls: {
-                display_url: string,
-                expanded_url: string,
-                url: string,
-                indices: [ number, number ]
-              }[];
-            };
-            url: {
-              urls: {
-                display_url: string;
-                expanded_url: string;
-                url: string;
-                indices: [number, number];
-              }[];
-            };
-          };
-          fast_followers_count: number;
-          favourites_count: number;
-          followers_count: number;
-          friends_count: number;
-          has_custom_timelines: boolean;
-          is_translator: boolean;
-          listed_count: number;
-          location: string;
-          media_count: number;
-          name: string;
-          normal_followers_count: number;
-          pinned_tweet_ids_str: string[];
-          possibly_sensitive: boolean;
-          profile_banner_url: string;
-          profile_image_url_https: string;
-          profile_interstitial_type: string;
-          screen_name: string;
-          statuses_count: number;
-          translator_type: string;
-          url?: string;
-          verified: boolean;
-          want_retweets: boolean;
-          withheld_in_countries: unknown[];
-        };
-      };
-    };
+    user_results: RawUserResults;
   };
   unmention_data: {};
   edit_control: {
@@ -401,32 +426,7 @@ export interface RawTweetData {
     id_str: string;
     retweeted_status_result?: RawTweetResult;
   }
-  card?: {
-    rest_id: string;
-    legacy: {
-      binding_values: {
-        key: string;
-        value: {
-          string_value: string;
-          type: string;
-        };
-      }[];
-      card_platform: {
-        platform: {
-          audience: {
-            name: string;
-          };
-          device: {
-            name: string;
-            version: string;
-          };
-        };
-      };
-      name: string;
-      url: string;
-      user_refs_results: any[];
-    };
-  };
+  card?: TweetCardData;
 }
 
 export type RawProfileConversationTweetData = RawTweetData & {
@@ -624,4 +624,114 @@ export interface RawConversationThreadItemData {
       };
     }
   };
+}
+
+export type ImageCardBindingValues = {
+  key: string;
+  value: {
+    type: string;
+    image_value: {
+      height: number;
+      width: number;
+      url: string;
+    };
+  };
+}[]
+
+export type VideoCardBindingValues = {
+  key: string;
+  value: {
+    type: string;
+    string_value: string;
+  };
+}[]
+
+export interface TweetCardData {
+  rest_id: string;
+  legacy: {
+    binding_values: ImageCardBindingValues | VideoCardBindingValues;
+    card_platform: {
+      platform: {
+        audience: {
+          name: string;
+        };
+        device: {
+          name: string;
+          version: string;
+        };
+      };
+    };
+    name: string;
+    url: string;
+    user_refs_results: RawUserResults[];
+  };
+};
+
+export interface unifiedCardKeyData {
+  type: string;
+  component_objects: {
+    [key: `media_${number}`]: {
+      type: string;
+      data: {
+        id: string;
+        destination: string;
+      };
+    };
+    [key: `details_${number}`]: {
+      type: string;
+      data: {
+        title: {
+          content: string;
+          is_rtl: boolean;
+        };
+        subtitle: {
+          content: string;
+          is_rtl: boolean;
+        };
+        destination: string;
+      };
+    };
+  };
+  destination_objects: {
+    [key: string]: any;
+  };
+  components: string[];
+  media_entities: {
+    [key: string]: {
+      id: number;
+      id_str: string;
+      indices: [number, number];
+      media_url: string;
+      media_url_https: string;
+      url: string;
+      display_url: string;
+      expanded_url: string;
+      type: "photo" | "video" | "animated_gif";
+      original_info: {
+        width: number;
+        height: number;
+      };
+      sizes: {
+        [key: string]: {
+          w: number;
+          h: number;
+          resize: string;
+        }
+      };
+      source_user_id: number;
+      source_user_id_str: string;
+      video_info: {
+        aspect_ratio: [number, number];
+        duration_millis: number;
+        variants: {
+          bitrate?: number;
+          content_type: 'video/mp4' | 'application/x-mpegURL';
+          url: string;
+        }[];
+      };
+      media_key: string;
+      ext?: any;
+    };
+  };
+  experiment_signals: any;
 }
