@@ -7,6 +7,11 @@
 - `Axios` - To handle everything else
 
 ## Usage
+### Installation
+1. Clone the repository
+2. Run `npm install` to install dependencies
+3. Import `{ Client }` from the root directory
+
 > [!NOTE]
 > All code snippets are featured in `./example/example.ts`
 ### Initialising the client:
@@ -14,6 +19,8 @@
 - `headless` - Boolean (Optional) - Defaults to true.
 - `puppeteerSettings` - [PuppeteerLaunchOptions](https://github.com/puppeteer/puppeteer/blob/main/docs/api/puppeteer.launchoptions.md) (Optional)
 ```ts
+import { Client } from "./Twitter-Selfbot-Library";
+
 const client = new Client({
   headless: true, // If the puppeteer browser should be visible or not.
   puppeteerSettings: { // Puppeteer launch settings
@@ -98,7 +105,7 @@ Some timelines may require additional properties (also listed below)
 
 Timelines come equipped with a `stream()` method which should cover the majority of use cases.
 > [!NOTE]
-> When streaming tweets, any incoming tweets will be emitted in a `timelineUpdate` event unless a callback function is passed as the second argument
+> When streaming tweets, any incoming tweets will be emitted in a `timelineUpdate` event unless a callback function is passed as the second argument (`(tweets: TimelineTweetReturnData) => ...`)
 
 The stream method takes in 2 arguments:
 1. **An object containing optional parameters:**
@@ -132,17 +139,18 @@ The stream method takes in 2 arguments:
 ```
 
 ```ts
-import { PostsTimeline } from '../src'
+import { Tweet } from "./Twitter-Selfbot-Library";
+
 // create profile for elon musk
 const elon = await client.profiles.fetch({
   username: 'elonmusk'
 })
 
 // get elon musk's posts timeline
-const elonPosts = await elon.timelines.fetch('posts') as PostsTimeline
+const elonPosts = await elon.timelines.fetch('posts')
 
 // listen for tweets
-elonPosts.on('timelineUpdate', async (tweets: Tweet<RawTweetData>[]) => {
+elonPosts.on('timelineUpdate', async (tweets: Tweet[]) => {
   console.log(tweets.map(t => t.text).join('\n'))
 })
 
@@ -164,11 +172,39 @@ Each method returns the following structure:
   }
   ```
 
+## Notifications
+
+You can stream notifications using `<Client>.notifications.stream(ms)` and listen for new notifications via the `unreadNotifications` event.
+
+This uses twitter's notifications API to determine which notifications are unread. This means that if you read a notification on twitter it will no longer be considered unread by the library.
+
+If you want to access notifications that have already been read, you can access them via `<Client>.notifications` which has 3 timelines:
+- `all` - All notifications
+- `mentions` - All mention notifications
+- `verified` - All notifications from verified users
+
+Each timeline has a `notifications` array containing the first set of notifications sent by the API. You can use the timeline method `.scroll()` to fetch earlier notifications.
+
+### Example
+
+```ts
+client.on('unreadNotifications', async (notifications) => {
+  console.log('Unread Notifications:', notifications.length, 'total:', client.notifications.all.notifications.length);
+  notifications.forEach(async (notif) => { // log the media in tweets you are mentioned in
+    const tweet = notif.tweet
+    if(notif.isMention()) console.log(!!tweet.media?.length ? tweet.media : 'no media');
+  })
+})
+
+// check for new notifications every 10 seconds
+client.notifications.stream(10000);
+```
+
 ## Extra tools
 
 Once a timeline is initialised via `timelines.fetch()`, it emits a `timelineCreate` event. The same goes for profiles.
 ```ts
-import { Timeline, Profile } from "../src";
+import { Timeline, Profile } from "./Twitter-Selfbot-Library";
 
 client.on('timelineCreate', async (timeline: Timeline) => {
   console.log('Timeline Created:', timeline.type) // 'home' | 'following' | 'list' | 'posts' | 'media' | 'replies' | 'tweetReplies' | 'search'
