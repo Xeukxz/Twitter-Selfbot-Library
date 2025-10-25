@@ -28,8 +28,9 @@ export class TimelineTweetManager<TweetData extends TweetEntryTypes>  {
   }
 
   addTweets(tweets: TweetData[]) {
-    console.log(`${tweets.filter(tweet => !['tweet-', 'profile-grid-', 'profile-conversation-', 'conversationthread-'].some(str => tweet.entryId.startsWith(str))).map(tweet => `Skipping ${tweet.entryId}`).join('\n')}`)
-    tweets = tweets.filter(tweet => ['tweet-', 'profile-grid-', 'profile-conversation-', 'conversationthread-'].some(str => tweet.entryId.startsWith(str)));
+    const validEntryNames = ['tweet-', 'profile-grid-', 'profile-conversation-', 'conversationthread-'];
+    console.log(`${tweets.filter(tweet => !validEntryNames.some(str => tweet.entryId.startsWith(str))).map(tweet => `Skipping ${tweet.entryId}`).join('\n')}`)
+    tweets = tweets.filter(tweet => validEntryNames.some(str => tweet.entryId.startsWith(str)));
     let newTweets = tweets.filter(tweet => !this.cache.some(cachedTweet => {
       return cachedTweet.id == Tweet.ParseEntryToData(tweet)?.rest_id
     })

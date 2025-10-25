@@ -1,13 +1,13 @@
 import { Client } from "../Client";
 import { RawTweetEntryData, Tweet } from "../Tweet";
 import {
-  BaseTimeline,
+  BaseTweetBasedTimeline,
   BaseTimelineUrlData,
   BottomCursorData,
   TimelineAddEntries,
   TimelineReplaceEntry,
   TopCursorData,
-} from "./BaseTimeline";
+} from "./BaseTweetBasedTimeline";
 import fs from "fs";
 
 export interface SearchTimelineData {
@@ -26,7 +26,7 @@ export interface SearchTimelineData {
   count?: number;
 }
 
-export class SearchTimeline extends BaseTimeline<RawTweetEntryData> {
+export class SearchTimeline extends BaseTweetBasedTimeline<RawTweetEntryData> {
   cache: RawSearchTimelineResponseData[] = [];
   variables: SearchTimelineUrlData["variables"] = {
     rawQuery: "",
@@ -70,7 +70,7 @@ export class SearchTimeline extends BaseTimeline<RawTweetEntryData> {
     };
   }
 
-  buildTweetsFromCache(data: RawSearchTimelineResponseData) {
+  buildTweets(data: RawSearchTimelineResponseData) {
     return new Promise<Tweet<RawTweetEntryData>[]>((resolve, reject) => {
       if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-search.json`, JSON.stringify(data, null, 2));
       let tweets = this.tweets.addTweets(

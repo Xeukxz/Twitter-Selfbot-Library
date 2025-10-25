@@ -1,5 +1,5 @@
 import { Client, FeaturesGetData } from "./Client"
-import { RepliesTimeline, Timeline } from "./Timelines"
+import { RepliesTimeline, TweetBasedTimeline } from "./Timelines"
 import { PostsTimeline } from "./Timelines/ProfileTimelines/PostsTimeline"
 import { Queries } from './Routes';
 import { ProfileFetchData } from "./Managers";
@@ -16,12 +16,12 @@ export class Profile {
 
   protected _timelines: { // so that the timelines are only created when needed. idk if there's a better way to do this
     posts?: PostsTimeline
-    replies?: Timeline
-    highlights?: Timeline
-    media?: Timeline
-    likes?: Timeline
+    replies?: TweetBasedTimeline
+    highlights?: TweetBasedTimeline
+    media?: TweetBasedTimeline
+    likes?: TweetBasedTimeline
     lists: {
-      [listId: string]: Timeline
+      [listId: string]: TweetBasedTimeline
     }
   } = {
     posts: undefined,

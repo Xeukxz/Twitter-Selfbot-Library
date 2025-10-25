@@ -1,4 +1,4 @@
-export * from './BaseTimeline'
+export * from './BaseTweetBasedTimeline'
 export * from './HomeTimeline'
 export * from './ListTimeline'
 export * from './FollowingTimeline'

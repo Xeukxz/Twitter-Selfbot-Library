@@ -1,6 +1,6 @@
 import { RawTweetEntryData, Tweet } from "../Tweet";
 import { Client } from "../Client";
-import { BaseTimeline, BaseTimelineUrlData, BottomCursorData, Cursor, TimelineAddEntries, TimelineTweetEntryData, TopCursorData } from "./BaseTimeline";
+import { BaseTweetBasedTimeline, BaseTimelineUrlData, BottomCursorData, Cursor, TimelineAddEntries, TimelineEntryData, TopCursorData } from "./BaseTweetBasedTimeline";
 import fs from 'fs';
 import { Queries } from "../Routes";
 import { TimelineTweetManager } from "../Managers";
@@ -11,7 +11,7 @@ export interface ListTimelineData {
 }
 
 
-export class ListTimeline extends BaseTimeline<RawTweetEntryData> {
+export class ListTimeline extends BaseTweetBasedTimeline<RawTweetEntryData> {
   cache: RawListTimelineResponseData[] = []
   id: string
 
@@ -51,7 +51,7 @@ export class ListTimeline extends BaseTimeline<RawTweetEntryData> {
     };
   }
 
-  buildTweetsFromCache(data: RawListTimelineResponseData) {
+  buildTweets(data: RawListTimelineResponseData) {
     return new Promise<Tweet<RawTweetEntryData>[]>((resolve, reject) => {
       if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-list.json`, JSON.stringify(data, null, 2))
       let tweets = this.tweets.addTweets(data.data.list.tweets_timeline.timeline.instructions[0].entries as RawTweetEntryData[])

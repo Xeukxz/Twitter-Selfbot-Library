@@ -1,8 +1,10 @@
 import { Client, FeaturesGetData } from './Client';
 import { Queries } from "./Routes";
 import { TimelineTerminateTimeline } from './Timelines';
-import { TimelineAddEntries } from './Timelines/BaseTimeline';
+import { TimelineAddEntries } from './Timelines/BaseTweetBasedTimeline';
+import { RawNotificationEntryData, RawNotificationUserMentionedYouContent, RawNotificationUserRepliedToTweetContent, RawNotificationUsersLikedTweetContent } from './Timelines/NotificationTimeline';
 import { TweetRepliesTimeline } from './Timelines/TweetRepliesTimeline';
+import fs from 'fs';
 
 export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
   client: Client;
@@ -34,6 +36,8 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
   retweetedTweet?: Tweet;
   quotedTweet?: Tweet;
   unavailable: boolean = false;
+  parentId?: string;
+  parent?: Tweet;
   raw!: RawTweetData | RawProfileConversationTweetData;
 
   variables = {
@@ -56,9 +60,9 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
     try {
       this.buildTweet(Tweet.ParseEntryToData(RawEntryOrTweetData), RawEntryOrTweetData);
     } catch (e) {
-      if(client.debug) console.log(JSON.stringify(RawEntryOrTweetData, null, 2));
+      client.log(JSON.stringify(RawEntryOrTweetData, null, 2));
       console.log(`Bad tweet: ${(RawEntryOrTweetData as T).entryId || (RawEntryOrTweetData as TweetTypes).rest_id}`);
-      throw new Error(`${e}`);
+      throw e;
     }
   }
 
@@ -70,18 +74,23 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
     }) as Promise<TweetRepliesTimeline>;
   }
 
-  static getTweetFromResult(tweetResult: RawTweetResult): TweetTypes | undefined {
+  static getTweetDataFromResult(tweetResult: RawTweetResult): TweetTypes | undefined {
     return Object.keys(tweetResult).length == 0 ? undefined : ("tweet" in tweetResult.result ? tweetResult.result.tweet : tweetResult.result);
   }
 
   static ParseEntryToData(entry: TweetEntryTypes | TweetTypes): TweetTypes {
-    let tweetResult = 
+    let tweetResult =
       (entry as RawTweetEntryData).content?.itemContent?.tweet_results ||
       (entry as RawGridEntryData).item?.itemContent?.tweet_results ||
-      (entry as RawProfileConversationEntryData).content?.items[1]?.item?.itemContent?.tweet_results ||
-      (entry as RawConversationThreadEntryData).content.items[0].item.itemContent.tweet_results;
+      (entry as RawProfileConversationEntryData).content?.items?.[1]?.item?.itemContent?.tweet_results ||
+      (entry as RawConversationThreadEntryData)?.content?.items?.[0]?.item?.itemContent?.tweet_results ||
+      ((d = (entry as RawNotificationEntryData)?.content?.itemContent) => d
+        ? (d as RawNotificationUsersLikedTweetContent)?.template?.targetObjects[0]?.tweet_results ||
+          (d as RawNotificationUserRepliedToTweetContent | RawNotificationUserMentionedYouContent)?.tweet_results
+        : undefined
+      )
       
-    let tweetData = tweetResult ? Tweet.getTweetFromResult(tweetResult) : entry as TweetTypes;
+    let tweetData = tweetResult ? Tweet.getTweetDataFromResult(tweetResult) : entry as TweetTypes;
     return tweetData as TweetTypes;
   }
 
@@ -89,31 +98,33 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
     return (await this.replies)?.fetch();
   }
 
+  setUnavailable(rawData: T | TweetTypes) {
+    this.unavailable = true;
+    this.id = (rawData as T).entryId?.split("-")[1] || "";
+    this.user = {
+      id: "",
+      name: "",
+      username: "",
+      profilePictureUrl: "",
+    };
+  }
+
   buildTweet(tweetData: TweetTypes | undefined, rawData: T | TweetTypes) {
     this.raw = tweetData as RawTweetData;
-    if(!tweetData) {
-      this.unavailable = true;
-      this.id = (rawData as T).entryId?.split("-")[1] || "";
-      this.user = {
-        id: "",
-        name: "",
-        username: "",
-        profilePictureUrl: "",
-      };
-      return;
-    }
+    if(!tweetData) return this.setUnavailable(rawData);
+    if("tombstone" in tweetData) return this.setUnavailable(rawData);
 
     let retweetResult = (tweetData.legacy.retweeted_status_result);
     if(retweetResult) {
       this.isRetweet = true;
       this.retweetedTweet = new Tweet(this.client)
-      this.retweetedTweet.buildTweet(Tweet.getTweetFromResult(retweetResult), rawData);
+      this.retweetedTweet.buildTweet(Tweet.getTweetDataFromResult(retweetResult), rawData);
     }
 
     let quotedResult = tweetData.quoted_status_result;
     if(quotedResult) {
       this.quotedTweet = new Tweet(this.client);
-      this.quotedTweet.buildTweet(Tweet.getTweetFromResult(quotedResult), rawData);
+      this.quotedTweet.buildTweet(Tweet.getTweetDataFromResult(quotedResult), rawData);
     }
 
 
@@ -179,7 +190,7 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
   }
 }
 export type TweetTypes = RawTweetData | RawProfileConversationTweetData
-export type TweetEntryTypes = RawTweetEntryData | RawGridEntryData | RawProfileConversationEntryData | RawConversationThreadEntryData;
+export type TweetEntryTypes = RawTweetEntryData | RawGridEntryData | RawProfileConversationEntryData | RawConversationThreadEntryData | RawNotificationEntryData;
 export interface RawTweetResult {
   result: ({
     __typename: string;
@@ -414,6 +425,9 @@ export interface RawTweetData {
     favorite_count: number;
     favorited: boolean;
     full_text: string;
+    in_reply_to_screen_name?: string;
+    in_reply_to_status_id_str?: string;
+    in_reply_to_user_id_str?: string;
     is_quote_status: boolean;
     lang: string;
     possibly_sensitive: boolean;

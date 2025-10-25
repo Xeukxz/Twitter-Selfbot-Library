@@ -1,4 +1,4 @@
-import { Client, Timeline, Tweet } from "../src";
+import { Client, TweetBasedTimeline, Tweet } from "../src";
 
 const client = new Client({
   headless: true, // If the puppeteer browser should be visible or not.
@@ -8,8 +8,13 @@ const client = new Client({
   },
 });
 
-client.on("ready", async () => {
-  let streamList: Timeline[] = [];
+client.on("ready", () => {
+  streamNotifications();
+  streamTimelines();
+});
+
+async function streamTimelines() {
+  const streamList: TweetBasedTimeline[] = [];
 
   // // create home timeline
   // const home = await client.timelines.fetch({
@@ -66,9 +71,21 @@ client.on("ready", async () => {
   // });
   // streamList.push(searchResults);
 
-  // stream timelines
   streamAll(streamList);
-});
+};
+
+function streamNotifications() {
+  client.on('unreadNotifications', async (notifications) => {
+    console.log('Unread Notifications:', notifications.length, 'total:', client.notifications.all.notifications.length);
+    notifications.forEach(async (notif) => { // log the media in tweets you are mentioned in
+      const tweet = notif.tweet
+      if(notif.isMention()) console.log(!!tweet.media?.length ? tweet.media : 'no media');
+    })
+  })
+
+  // check for new notifications every 10 seconds
+  client.notifications.stream(10000);
+};
 
 client.on('timelineCreate', async (timeline) => {
   console.log('Timeline Created:', timeline.type); // 'home' | 'following' | 'list' | 'posts' | 'media' | 'replies' | 'tweetReplies' | 'search'
@@ -79,7 +96,7 @@ client.on('profileCreate', async (profile) => {
   console.log('Profile Created:', profile.username);
 });
 
-function streamAll(timelines: Timeline[]) {
+function streamAll(timelines: TweetBasedTimeline[]) {
   timelines.forEach((timeline) => { // stream each timeline and log new tweets
     // manage new tweets
     timeline.on('timelineUpdate', async (tweets: Tweet[]) => {
@@ -99,4 +116,4 @@ function streamAll(timelines: Timeline[]) {
       maxCatchUpLoops: 5,
     });
   });
-}
+};

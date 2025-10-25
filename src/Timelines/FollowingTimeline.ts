@@ -1,13 +1,13 @@
 import { RawTweetEntryData, Tweet } from "../Tweet";
 import { Client } from "../Client";
-import { BaseTimeline, BaseTimelineUrlData, BottomCursorData, TimelineAddEntries, TimelineShowAlert, TopCursorData } from "./BaseTimeline";
+import { BaseTweetBasedTimeline, BaseTimelineUrlData, BottomCursorData, TimelineAddEntries, TimelineShowAlert, TopCursorData } from "./BaseTweetBasedTimeline";
 import fs from 'fs';
 
 export interface FollowingTimelineData {
   count?: number;
 }
 
-export class FollowingTimeline extends BaseTimeline<RawTweetEntryData> {
+export class FollowingTimeline extends BaseTweetBasedTimeline<RawTweetEntryData> {
   cache: RawFollowingTimelineResponseData[] = [];
   variables: FollowingTimelineUrlData["variables"] = {
     includePromotedContent: true,
@@ -48,7 +48,7 @@ export class FollowingTimeline extends BaseTimeline<RawTweetEntryData> {
     };
   }
 
-  buildTweetsFromCache(data: RawFollowingTimelineResponseData) {
+  buildTweets(data: RawFollowingTimelineResponseData) {
     return new Promise<Tweet<RawTweetEntryData>[]>((resolve, reject) => {
       if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-following.json`, JSON.stringify(data, null, 2));
       let tweets = this.tweets.addTweets(

@@ -3,11 +3,14 @@ import { TimelineManager } from "./Managers/TimelineManager";
 import { RESTApiManager } from "./REST/rest";
 import puppeteer, { PuppeteerLaunchOptions } from "puppeteer";
 import fs from "fs";
-import { Timeline } from "./Timelines";
+import { TweetBasedTimeline } from "./Timelines";
 import { ProfileManager } from "./Managers/ProfileManager";
 import { Profile } from "./Profile";
 import { GlobalTweetManager } from "./Managers";
 import { SearchTimelineUrlData } from "./Timelines/SearchTimeline";
+import { NotificationsManager } from './Managers/NotificationsManager';
+import { Notification } from './Timelines/NotificationTimeline';
+import { ClientTransaction, handleXMigration } from 'x-client-transaction-id';
 
 export interface ClientParams {
   headless?: boolean;
@@ -18,8 +21,9 @@ export interface ClientParams {
 
 export interface ClientEvents {
   ready: [ void ];
-  timelineCreate: [ Timeline ];
+  timelineCreate: [ TweetBasedTimeline ];
   profileCreate: [ Profile ];
+  unreadNotifications: [ Notification[] ];
 }
 
 
@@ -31,6 +35,7 @@ export class Client extends EventEmitter<ClientEvents> {
   timelines: TimelineManager = new TimelineManager(this)
   tweets: GlobalTweetManager = new GlobalTweetManager(this)
   profiles: ProfileManager = new ProfileManager(this)
+  notifications: NotificationsManager = new NotificationsManager(this)
   debug: boolean // writes multiple debug files, not recommended for production
   features!: {
     config: {
@@ -44,6 +49,7 @@ export class Client extends EventEmitter<ClientEvents> {
     settingsVersion: string,
     get: <T extends string[]>(keys: T) => FeaturesGetData<T>
   }
+  pageHtml: string = "";
   /**
    * Create a new client
    * 
@@ -64,10 +70,18 @@ export class Client extends EventEmitter<ClientEvents> {
       headless,
       keepPageOpen,
       puppeteerSettings
-    }).then(() => {
+    }).then(async () => {
       this.rest = new RESTApiManager(this);
+      const dom = await handleXMigration();
+      const transactionGenerator = await ClientTransaction.create(dom);
+      this.rest.transactionGenerator = transactionGenerator;
+      await this.notifications.fetchAll();
       this.emit("ready");
     })
+  }
+
+  log(message: string) {
+    if(this.debug) console.log(message);
   }
 
   async getAccountData({
@@ -95,9 +109,9 @@ export class Client extends EventEmitter<ClientEvents> {
       let parsedStoredData = JSON.parse(storedData);
       
       if(Object.keys(parsedStoredData?.cookies ?? parsedStoredData).length > 0) {
-        if(this.debug) console.log("Found stored account data.");
+        this.log("Found stored account data.");
       } else {
-        if(this.debug) console.log("No stored account data found.");
+        this.log("No stored account data found.");
         headless = false;
       }
       
@@ -189,8 +203,8 @@ export class Client extends EventEmitter<ClientEvents> {
       await page.goto("https://twitter.com/home")
       
       // parse the html to match the window.__INITIAL_STATE__ declaration
-      const html = await page.content();
-      const InitialStateObjectString = html.match(/window\.__INITIAL_STATE__=({.*?});/)?.[1] || '';
+      this.pageHtml = await page.content();
+      const InitialStateObjectString = this.pageHtml.match(/window\.__INITIAL_STATE__=({.*?});/)?.[1] || '';
       const __INITIAL_STATE__ = JSON.parse(InitialStateObjectString)
       let featureSwitches = __INITIAL_STATE__?.["featureSwitch"]?.["user"] || {}
 

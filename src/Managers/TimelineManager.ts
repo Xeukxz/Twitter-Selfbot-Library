@@ -1,6 +1,6 @@
 import { Client } from "../Client";
 import { ProfileTimelineTypes } from "../Profile";
-import { Timeline, TimelineTypes } from "../Timelines/BaseTimeline";
+import { TweetBasedTimeline, TimelineType } from "../Timelines/BaseTweetBasedTimeline";
 import { FollowingTimeline } from "../Timelines/FollowingTimeline";
 import { HomeTimeline } from "../Timelines/HomeTimeline";
 import { ListTimeline } from "../Timelines/ListTimeline";
@@ -13,7 +13,7 @@ import { SearchTimeline, SearchTimelineUrlData } from "../Timelines/SearchTimeli
 
 export class TimelineManager {
   client: Client
-  cache: Timeline[] = [];
+  cache: TweetBasedTimeline[] = [];
   constructor(client: Client) {
     this.client = client
   }
@@ -24,7 +24,7 @@ export class TimelineManager {
    */
   async fetch<T extends TimelineFetchData>(data: T): Promise<FetchedInstance<T>> {
     console.log('Fetching Timeline:', data.type)
-    let existing = this.cache.find((timeline: Timeline) => 
+    let existing = this.cache.find((timeline: TweetBasedTimeline) => 
       (Object.keys(data) as Array<keyof T>)
         .every((key) => (timeline as FetchedInstance<T>)[key] === data[key])
       )
@@ -64,7 +64,7 @@ export const MappedTimelines = {
 }
 
 interface TimelineBaseFetchData {
-  type: TimelineTypes
+  type: TimelineType
   count?: number
 }
 

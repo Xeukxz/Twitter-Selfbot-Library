@@ -6,7 +6,7 @@ import {
 } from "../../Tweet";
 import fs from "fs";
 import {
-  BaseTimeline,
+  BaseTweetBasedTimeline,
   BaseTimelineUrlData,
   BottomCursorData,
   Cursor,
@@ -14,9 +14,9 @@ import {
   TimelineAddEntries,
   TimelineClearCache,
   TimelineTerminateTimeline,
-  TimelineTweetEntryData,
+  TimelineEntryData,
   TopCursorData,
-} from "../BaseTimeline";
+} from "../BaseTweetBasedTimeline";
 import { Tweet } from '../../Tweet';
 
 export interface MediaTimelineData {
@@ -24,7 +24,7 @@ export interface MediaTimelineData {
   count?: number;
 }
 
-export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
+export class MediaTimeline extends BaseTweetBasedTimeline<RawGridEntryData> {
   cache: RawMediaAddToModuleTimelineResponseData[] = [];
   profile!: Profile;
   private profileUsername: string;
@@ -35,7 +35,6 @@ export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
     withBirdwatchNotes: false,
     withClientEventToken: false,
     withVoice: true,
-    withV2Timeline: true,
     ...super._variables,
   }
   constructor(client: Client, data: MediaTimelineData) {
@@ -47,7 +46,7 @@ export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
     this.variables.cursor = this.cursors.top
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch()
-    let instructions = (rawData as RawMediaAddToModuleTimelineResponseData).data.user.result.timeline_v2.timeline.instructions;
+    let instructions = (rawData as RawMediaAddToModuleTimelineResponseData).data.user.result.timeline.timeline.instructions;
     let entries = (instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawGridEntryData>)!.entries;
     this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.resetVariables()
@@ -61,7 +60,7 @@ export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
     this.variables.cursor = this.cursors.bottom
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch()
-    let instructions = (rawData as RawMediaAddToModuleTimelineResponseData).data.user.result.timeline_v2.timeline.instructions;
+    let instructions = (rawData as RawMediaAddToModuleTimelineResponseData).data.user.result.timeline.timeline.instructions;
     let entries = (instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawGridEntryData>)!.entries;
     this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
     this.resetVariables()
@@ -100,7 +99,7 @@ export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
             .then(async (res) => {
               let data: RawMediaModuleTimelineResponseData = res.data;
               this.cache.push(res.data);
-              let firstTweets = await this.buildTweetsFromCache(
+              let firstTweets = await this.buildTweets(
                 res.data as RawMediaModuleTimelineResponseData
               );
               fetchData.tweets.push(...firstTweets);
@@ -115,7 +114,7 @@ export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
         if (!firstFetch) return reject("Failed to fetch initial timeline");
 
         const cursorEntries =
-          (firstFetch.data.user.result.timeline_v2.timeline.instructions.find(
+          (firstFetch.data.user.result.timeline.timeline.instructions.find(
             (i) => i.type == "TimelineAddEntries"
           ) as MediaModuleTimelineAddEntries)!.entries.filter(
             (e) => e.content.entryType == "TimelineTimelineCursor"
@@ -136,9 +135,9 @@ export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
 
         // not merging raw data rn since they are in diferent forms and is too headache
         
-        // let firstRawFetchEntries = (fetchData.rawData.data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)
+        // let firstRawFetchEntries = (fetchData.rawData.data.user.result.timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries)
         // console.log(firstRawFetchEntries)
-        // let secondRawFetchEntries = ((nextFetchResults.rawData as RawMediaAddToModuleTimelineResponseData).data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddToModule") as TimelineAddToModule);
+        // let secondRawFetchEntries = ((nextFetchResults.rawData as RawMediaAddToModuleTimelineResponseData).data.user.result.timeline.timeline.instructions.find(i => i.type == "TimelineAddToModule") as TimelineAddToModule);
         // console.log(secondRawFetchEntries)
         // firstRawFetchEntries!.entries.push(...secondRawFetchEntries!.moduleItems)
 
@@ -147,21 +146,21 @@ export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
     });
   }
 
-  async buildTweetsFromCache(data: RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData ) {
+  async buildTweets(data: RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData ) {
     return new Promise<Tweet<RawGridEntryData>[]>((resolve, reject) => {
       if (this.client.debug)
         fs.writeFileSync(
           `${__dirname}/../../../debug/debug-media.json`,
           JSON.stringify(data, null, 2)
         );
-      if (data.data.user.result.timeline_v2.timeline.instructions.length == 3) {
-        const module: ModuleTimelineEntry = (data.data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as MediaModuleTimelineAddEntries)!.entries[0]
+      if (data.data.user.result.timeline.timeline.instructions.length == 3) {
+        const module: ModuleTimelineEntry = (data.data.user.result.timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as MediaModuleTimelineAddEntries)!.entries[0]
         let tweets = this.tweets.addTweets(module.content.items);
         resolve(tweets);
       } else {
         let tweets = this.tweets.addTweets(
           ((
-            data.data.user.result.timeline_v2.timeline.instructions.find(
+            data.data.user.result.timeline.timeline.instructions.find(
               (i) => i.type == "TimelineAddToModule"
             ) as TimelineAddToModule
           )!.moduleItems as RawGridEntryData[]) || []
@@ -172,7 +171,7 @@ export class MediaTimeline extends BaseTimeline<RawGridEntryData> {
   }
 
   setCursors(rawTimelineData: RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData): void {
-    let entries = (rawTimelineData.data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawGridEntryData>)!.entries;
+    let entries = (rawTimelineData.data.user.result.timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawGridEntryData>)!.entries;
     this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
   }
@@ -185,7 +184,6 @@ export interface MediaTimelineUrlData {
     withClientEventToken: boolean;
     withBirdwatchNotes: boolean;
     withVoice: boolean;
-    withV2Timeline: boolean;
   };
   features: BaseTimelineUrlData["features"];
 }
@@ -195,7 +193,7 @@ export interface RawMediaModuleTimelineResponseData {
     user: {
       result: {
         __typename: string;
-        timeline_v2: {
+        timeline: {
           timeline: {
             instructions: [
               TimelineClearCache,
@@ -238,7 +236,7 @@ export interface RawMediaAddToModuleTimelineResponseData {
     user: {
       result: {
         __typename: "User";
-        timeline_v2: {
+        timeline: {
           timeline: {
             instructions: [TimelineAddToModule, MediaAddToModuleTimelineAddEntries]
             metadata: {

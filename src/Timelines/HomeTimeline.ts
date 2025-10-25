@@ -1,13 +1,13 @@
 import { RawTweetEntryData, Tweet, TweetEntryTypes } from "../Tweet";
 import { Client, FeaturesGetData } from "../Client";
-import { BaseTimeline, BaseTimelineUrlData, TimelineTweetEntryData, NewTimelineData, NewHomeTimelineData, TimelineAddEntries, TimelineShowAlert, Cursor, TopCursorData, BottomCursorData, RawTimelineResponseData } from "./BaseTimeline";
+import { BaseTweetBasedTimeline, BaseTimelineUrlData, TimelineEntryData, NewTimelineData, NewHomeTimelineData, TimelineAddEntries, TimelineShowAlert, Cursor, TopCursorData, BottomCursorData, RawTimelineResponseData } from "./BaseTweetBasedTimeline";
 import fs from 'fs';
 
 export interface HomeTimelineData {
   count?: number;
 }
 
-export class HomeTimeline extends BaseTimeline<RawTweetEntryData> {
+export class HomeTimeline extends BaseTweetBasedTimeline<RawTweetEntryData> {
   cache: RawHomeTimelineResponseData[] = [];
   variables: HomeTimelineUrlData["variables"] = {
     includePromotedContent: true,
@@ -50,7 +50,7 @@ export class HomeTimeline extends BaseTimeline<RawTweetEntryData> {
     };
   }
 
-  buildTweetsFromCache(data: RawHomeTimelineResponseData) {
+  buildTweets(data: RawHomeTimelineResponseData) {
     return new Promise<Tweet<RawTweetEntryData>[]>((resolve, reject) => {
       if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-home.json`, JSON.stringify(data, null, 2));
       let tweets = this.tweets.addTweets(

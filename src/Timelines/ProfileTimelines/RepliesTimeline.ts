@@ -2,7 +2,7 @@ import { Client } from "../../Client";
 import { Profile } from "../../Profile";
 import { RawProfileConversationEntryData, RawTweetEntryData, Tweet, TweetEntryTypes } from "../../Tweet";
 import {
-  BaseTimeline,
+  BaseTweetBasedTimeline,
   BaseTimelineUrlData,
   BottomCursorData,
   RawTimelineResponseData,
@@ -10,9 +10,9 @@ import {
   TimelineClearCache,
   TimelinePinEntry,
   TimelineShowAlert,
-  TimelineTweetEntryData,
+  TimelineEntryData,
   TopCursorData,
-} from "../BaseTimeline";
+} from "../BaseTweetBasedTimeline";
 import fs from "fs";
 
 export interface RepliesTimelineData {
@@ -20,7 +20,7 @@ export interface RepliesTimelineData {
   count?: number;
 }
 
-export class RepliesTimeline extends BaseTimeline<RawTweetEntryData | RawProfileConversationEntryData> {
+export class RepliesTimeline extends BaseTweetBasedTimeline<RawTweetEntryData | RawProfileConversationEntryData> {
   profile!: Profile;
   cache: RawRepliesTimelineResponseData[] = [];
   private profileUsername: string;
@@ -29,7 +29,6 @@ export class RepliesTimeline extends BaseTimeline<RawTweetEntryData | RawProfile
     includePromotedContent: true,
     withCommunity: true,
     withVoice: true,
-    withV2Timeline: true,
     ...super._variables,
   }
   constructor(
@@ -44,7 +43,7 @@ export class RepliesTimeline extends BaseTimeline<RawTweetEntryData | RawProfile
     this.variables.cursor = this.cursors.top;
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch();
-    let entries = ((rawData as RawRepliesTimelineResponseData).data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData | RawProfileConversationEntryData>)!.entries;
+    let entries = ((rawData as RawRepliesTimelineResponseData).data.user.result.timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData | RawProfileConversationEntryData>)!.entries;
     this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.resetVariables();
     return {
@@ -57,7 +56,7 @@ export class RepliesTimeline extends BaseTimeline<RawTweetEntryData | RawProfile
     this.variables.cursor = this.cursors.bottom;
     this.variables.count = 40;
     let { tweets, rawData } = await this.fetch();
-    let entries = ((rawData as RawRepliesTimelineResponseData).data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData | RawProfileConversationEntryData>)!.entries;
+    let entries = ((rawData as RawRepliesTimelineResponseData).data.user.result.timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData | RawProfileConversationEntryData>)!.entries;
     this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
     this.resetVariables();
     return {
@@ -80,7 +79,7 @@ export class RepliesTimeline extends BaseTimeline<RawTweetEntryData | RawProfile
     });
   }
 
-  async buildTweetsFromCache(data: RawRepliesTimelineResponseData) {
+  async buildTweets(data: RawRepliesTimelineResponseData) {
     return new Promise<Tweet<RawTweetEntryData>[]>((resolve, reject) => {
       if (this.client.debug)
         fs.writeFileSync(
@@ -88,11 +87,11 @@ export class RepliesTimeline extends BaseTimeline<RawTweetEntryData | RawProfile
           JSON.stringify(data, null, 2)
         );
       let tweets = this.tweets.addTweets(
-        ((data.data.user.result.timeline_v2.timeline.instructions.find(
+        ((data.data.user.result.timeline.timeline.instructions.find(
           (i) => i.type == "TimelineAddEntries"
         ) as TimelineAddEntries<RawTweetEntryData | RawProfileConversationEntryData>)!.entries as (RawTweetEntryData | RawProfileConversationEntryData)[]) || []
       );
-      let pinnedTweet = (data.data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelinePinEntry") as TimelinePinEntry)?.entry as RawTweetEntryData;
+      let pinnedTweet = (data.data.user.result.timeline.timeline.instructions.find(i => i.type == "TimelinePinEntry") as TimelinePinEntry)?.entry as RawTweetEntryData;
       if(pinnedTweet) tweets = [
         ...this.tweets.addTweets([pinnedTweet]),
         ...tweets
@@ -102,7 +101,7 @@ export class RepliesTimeline extends BaseTimeline<RawTweetEntryData | RawProfile
   }
 
   setCursors(rawTimelineData: RawRepliesTimelineResponseData): void {
-    let entries = (rawTimelineData.data.user.result.timeline_v2.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData | RawProfileConversationEntryData>)!.entries;
+    let entries = (rawTimelineData.data.user.result.timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData | RawProfileConversationEntryData>)!.entries;
     this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
     this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
   }
@@ -114,7 +113,6 @@ export interface RepliesTimelineUrlData {
     includePromotedContent: boolean;
     withCommunity: boolean;
     withVoice: boolean;
-    withV2Timeline: boolean;
   };
   features: BaseTimelineUrlData["features"];
 }
@@ -123,7 +121,7 @@ export interface RawRepliesTimelineResponseData {
   data: {
     user: {
       result: {
-        timeline_v2: {
+        timeline: {
           timeline: {
             instructions: (
               | TimelineClearCache

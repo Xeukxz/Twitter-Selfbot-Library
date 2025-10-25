@@ -1,12 +1,13 @@
-import { BaseTimeline, RawTimelineResponseData, TimelineTerminateTimeline } from "./BaseTimeline";
+import { BaseTweetBasedTimeline, RawTimelineResponseData, TimelineTerminateTimeline } from "./BaseTweetBasedTimeline";
 import { RawConversationThreadEntryData, RawTweetEntryData, Tweet, TweetEntryTypes } from '../Tweet';
 import { Client } from "../Client";
+import fs from 'fs';
 
 export interface tweetRepliesTimelineData {
   tweetId: string;
 }
 
-export class TweetRepliesTimeline extends BaseTimeline<RawConversationThreadEntryData | RawTweetEntryData> {
+export class TweetRepliesTimeline extends BaseTweetBasedTimeline<RawConversationThreadEntryData | RawTweetEntryData> {
   cache: RawTweetRepliesTimelineResponseData[] = [];
   tweet?: Tweet<RawTweetEntryData>;
   variables = {
@@ -31,7 +32,6 @@ export class TweetRepliesTimeline extends BaseTimeline<RawConversationThreadEntr
   }) {
     super(client, "tweetReplies");
     if("tweet" in data) {
-      console.log(data.tweet)
       this.variables.focalTweetId = data.tweet.id;
       this.tweet = data.tweet
     } else {
@@ -55,8 +55,13 @@ export class TweetRepliesTimeline extends BaseTimeline<RawConversationThreadEntr
     };
   }
 
-  buildTweetsFromCache(data: RawTweetRepliesTimelineResponseData) {
+  buildTweets(data: RawTweetRepliesTimelineResponseData) {
     return new Promise<Tweet<RawConversationThreadEntryData | RawTweetEntryData>[]>((resolve, reject) => {
+      if (this.client.debug)
+        fs.writeFileSync(
+          `${__dirname}/../../debug/debug-tweetReplies.json`,
+          JSON.stringify(data, null, 2)
+        );
       let instructions = data.data.threaded_conversation_with_injections_v2.instructions;
       let entries = (instructions.find(i => i.type == "TimelineAddEntries") as RawTweetRepliesTimelineAddEntries)!.entries;
       let tweets = entries.filter(e => e.entryId.startsWith("tweet-")) as RawTweetEntryData[];
@@ -64,7 +69,6 @@ export class TweetRepliesTimeline extends BaseTimeline<RawConversationThreadEntr
 
       let originalTweetEntry = tweets.find(t => t.entryId == "tweet-" + this.variables.focalTweetId);
       if(originalTweetEntry) {
-        console.log('Original Tweet Entry:', originalTweetEntry)
         if(!this.tweet) this.tweet = new Tweet(this.client);
         this.tweet.buildTweet(Tweet.ParseEntryToData(originalTweetEntry), originalTweetEntry);
       }
@@ -78,7 +82,10 @@ export class TweetRepliesTimeline extends BaseTimeline<RawConversationThreadEntr
   setCursors(rawTimelineData: RawTimelineResponseData): void {
     let instructions = (rawTimelineData as RawTweetRepliesTimelineResponseData).data.threaded_conversation_with_injections_v2.instructions;
     let entries = (instructions.find(i => i.type == "TimelineAddEntries") as RawTweetRepliesTimelineAddEntries)!.entries;
-    this.cursors.bottom = (entries.find(e => (e as TweetRepliesBottomCursorData).entryId?.startsWith("cursor-bottom")) as TweetRepliesBottomCursorData).content.itemContent.value;
+    // console.log(entries)
+    let cursor = (entries.find(e => (e as TweetRepliesBottomCursorData).entryId?.startsWith("cursor-bottom")) as TweetRepliesBottomCursorData) || (entries.find(e => (e as TweetRepliesBottomCursorData).entryId?.startsWith("cursor-showmorethreads-")) as TweetRepliesBottomCursorData);
+    if(!cursor) console.trace(`No bottom cursor found in tweet replies timeline`, entries);
+    this.cursors.bottom = (cursor.content.itemContent)?.value || (cursor.content as any).value;
   }
 }
 
