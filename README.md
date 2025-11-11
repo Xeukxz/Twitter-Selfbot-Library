@@ -1,42 +1,23 @@
 # Twitter-Selfbot-Library
 ### A Typescript library for automating a Twitter/X user account
 
-## Info
-**This library uses:**
-- `Puppeteer` - To scrape account cookies and token data
-- `Axios` - To handle everything else
-
 ## Usage
-### Installation
+### Installation:
 1. Clone the repository
 2. Run `npm install` to install dependencies
-3. Import `{ Client }` from the root directory
+3. Add your Twitter auth_token cookie to a `.env` file your project's root directory (`authToken=...`)
+   - To do get your auth_token cookie, log into Twitter, open devtools, and paste `document.cookie.match(/auth_token=\w+/)[0]` into the console, then copy the result into your `.env` file
+4. Import `{ Client }` from the root directory
 
 > [!NOTE]
 > All code snippets are featured in `./example/example.ts`
-### Initialising the client:
-**Parameters:**
-- `headless` - Boolean (Optional) - Defaults to true.
-- `puppeteerSettings` - [PuppeteerLaunchOptions](https://github.com/puppeteer/puppeteer/blob/main/docs/api/puppeteer.launchoptions.md) (Optional)
-```ts
-import { Client } from "./Twitter-Selfbot-Library";
-
-const client = new Client({
-  headless: true, // If the puppeteer browser should be visible or not.
-  puppeteerSettings: { // Puppeteer launch settings
-    // args: ['--no-sandbox', '--disable-setuid-sandbox'], // for some linux environments (see https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md#setting-up-chrome-linux-sandbox)
-  },
-})
-```
-When initialising the `Client` class for the first time, its creates an `accountData.json` file in the library's root directory.
-
-If there is no data in the file, it will open a browser window with headless set to false, regardless of the client parameters so that you can log in.
-
-Once you are logged into the account on the puppeteer browser, the account data will be written to `accountData.json` and the browser will not be used any further and will be closed.
-
 ### Initialising Timelines:
 Once the client emits the `ready` event, you can then create new timeline instances.
 ```ts
+import { Client } from "./Twitter-Selfbot-Library";
+
+const client = new Client()
+
 client.on('ready', async () => {
 
   // create home timeline instance

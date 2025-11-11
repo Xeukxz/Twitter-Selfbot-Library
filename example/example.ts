@@ -1,16 +1,12 @@
 import { Client, TweetBasedTimeline, Tweet } from "..";
 
-const client = new Client({
-  headless: true, // If the puppeteer browser should be visible or not.
-  puppeteerSettings: {
-    // Puppeteer launch settings
-    // args: ['--no-sandbox', '--disable-setuid-sandbox'], // for some linux environments (see https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md#setting-up-chrome-linux-sandbox)
-  },
-});
+const client = new Client();
+
+console.log(client)
 
 client.on("ready", () => {
-  streamNotifications();
   streamTimelines();
+  // streamNotifications();
 });
 
 async function streamTimelines() {

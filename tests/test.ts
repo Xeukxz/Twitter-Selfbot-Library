@@ -1,17 +1,10 @@
 import { Client, TweetBasedTimeline, Tweet } from "..";
 import fs from 'fs';
 
-console.log("Starting example...");
-
 if (!fs.existsSync('tests/out')) fs.mkdirSync('tests/out');
 
 const client = new Client({
-  headless: true, // If the puppeteer browser should be visible or not.
-  puppeteerSettings: {
-    // Puppeteer launch settings
-    // args: ['--no-sandbox', '--disable-setuid-sandbox'], // for some linux environments (see https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md#setting-up-chrome-linux-sandbox)
-  },
-  // debug: true
+  debug: true
 });
 
 client.on("ready", () => {

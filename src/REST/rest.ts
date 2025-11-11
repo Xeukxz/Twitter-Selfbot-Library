@@ -1,6 +1,6 @@
 import { Client } from "../Client";
 import { inspect } from 'util'
-import Axios, { AxiosError, AxiosResponse, RawAxiosRequestHeaders } from "axios";
+import Axios, { AxiosError, AxiosResponse, RawAxiosRequestHeaders, RawAxiosResponseHeaders } from "axios";
 import fs from 'fs'
 import { BaseTimelineUrlData } from '../Timelines/BaseTweetBasedTimeline';
 import { Queries } from "../Routes";
@@ -48,7 +48,7 @@ export class RESTApiManager {
     this.headers = {
       'Authorization': `${this.client.token}`,
       'x-csrf-token': `${this.client.csrfToken}`,
-      'Cookie': `${this.client.cookies}`,
+      'Cookie': `${Object.entries(this.client.cookies).map(([key, value]) => `${key}=${value}`).join('; ')}`,
       'content-type': "application/json",
       'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
       'Accept': "*/*",
@@ -69,6 +69,7 @@ export class RESTApiManager {
         url: url,
         headers: headers,
       }).then((res) => {
+        this.checkForSetCookieHeaders(res.headers);
         resolve(res);
       }).catch((err) => {
         reject(err);
@@ -86,11 +87,25 @@ export class RESTApiManager {
         headers: overwriteHeaders ? {...this.headers, ...overwriteHeaders} : this.headers,
         data: data
       }).then((res) => {
+        this.checkForSetCookieHeaders(res.headers);
         resolve(res);
       }).catch((err) => {
         reject(err);
       })
     });
+  }
+
+  private checkForSetCookieHeaders(headers: RawAxiosResponseHeaders) {
+    if(headers['set-cookie']) {
+      let setCookies = headers['set-cookie'];
+      if(typeof setCookies == 'string') setCookies = [setCookies];
+      setCookies.forEach((cookieStr) => {
+        let parts = cookieStr.split(';')[0].split('=');
+        let key = parts.shift()!.trim();
+        let value = parts.join('=').trim();
+        this.client.cookies[key] = value;
+      });
+    }
   }
 
   async graphQL({

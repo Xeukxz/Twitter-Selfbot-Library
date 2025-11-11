@@ -23,7 +23,7 @@ export class TimelineManager {
    * 
    */
   async fetch<T extends TimelineFetchData>(data: T): Promise<FetchedInstance<T>> {
-    console.log('Fetching Timeline:', data.type)
+    this.client.log('Fetching Timeline:', data.type)
     let existing = this.cache.find((timeline: TweetBasedTimeline) => 
       (Object.keys(data) as Array<keyof T>)
         .every((key) => (timeline as FetchedInstance<T>)[key] === data[key])

@@ -3,3 +3,4 @@ example/tweetData.csv
 node_modules
 debug
 tests/out/*
+.env

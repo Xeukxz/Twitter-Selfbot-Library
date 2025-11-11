@@ -1,7 +1,6 @@
 import EventEmitter from "node:events";
 import { TimelineManager } from "./Managers/TimelineManager";
 import { RESTApiManager } from "./REST/rest";
-import puppeteer, { PuppeteerLaunchOptions } from "puppeteer";
 import fs from "fs";
 import { TweetBasedTimeline } from "./Timelines";
 import { ProfileManager } from "./Managers/ProfileManager";
@@ -11,12 +10,13 @@ import { SearchTimelineUrlData } from "./Timelines/SearchTimeline";
 import { NotificationsManager } from './Managers/NotificationsManager';
 import { Notification } from './Timelines/NotificationTimeline';
 import { ClientTransaction, handleXMigration } from 'x-client-transaction-id';
+import { config } from 'dotenv';
+import Axios from 'axios';
+
+config();
 
 export interface ClientParams {
-  headless?: boolean;
-  keepPageOpen?: boolean;
   debug?: boolean;
-  puppeteerSettings?: PuppeteerLaunchOptions;
 }
 
 export interface ClientEvents {
@@ -30,7 +30,9 @@ export interface ClientEvents {
 export class Client extends EventEmitter<ClientEvents> {
   token!: string
   csrfToken!: string
-  cookies!: string
+  cookies: {
+    [key: string]: string
+  } = {};
   rest!: RESTApiManager
   timelines: TimelineManager = new TimelineManager(this)
   tweets: GlobalTweetManager = new GlobalTweetManager(this)
@@ -59,18 +61,11 @@ export class Client extends EventEmitter<ClientEvents> {
    * @param puppeteerSettings - Puppeteer launch settings
    */
   constructor({
-    headless = true,
-    keepPageOpen = false,
     debug = false,
-    puppeteerSettings
-  }: ClientParams) {
+  }: ClientParams = {}) {
     super();
     this.debug = debug; // ! DEVELOPMENT ONLY
-    this.getAccountData({
-      headless,
-      keepPageOpen,
-      puppeteerSettings
-    }).then(async () => {
+    this.getAccountData().then(async () => {
       this.rest = new RESTApiManager(this);
       const dom = await handleXMigration();
       const transactionGenerator = await ClientTransaction.create(dom);
@@ -80,154 +75,72 @@ export class Client extends EventEmitter<ClientEvents> {
     })
   }
 
-  log(message: string) {
-    if(this.debug) console.log(message);
+  log(...args: any[]) {
+    if(this.debug) console.log(...args);
   }
 
-  async getAccountData({
-    headless,
-    keepPageOpen,
-    puppeteerSettings
-  }: ClientParams) {
-    return new Promise<void>(async (resolve, reject) => {
-
-      if(this.debug) {
-        // ensure debug folder exists
-        if (!fs.existsSync(`${__dirname}/../debug`)) {
-          fs.mkdirSync(`${__dirname}/../debug`);
-          console.log("Debug folder created.");
-        }
+  async getAccountData() {
+    if(this.debug) {
+      // ensure debug folder exists
+      if (!fs.existsSync(`${__dirname}/../debug`)) {
+        fs.mkdirSync(`${__dirname}/../debug`);
+        this.log("Debug folder created.");
       }
+    }
+    
+    this.log("fetching auth token from env variable...");
+    const envToken = process.env.authToken;
+    if(envToken) this.cookies.auth_token = envToken;
+    else throw new Error('No stored account data found. Please add an `authToken` entry to your .env file');
 
-      // ensure storage file exists
-      if (!fs.existsSync(`${__dirname}/../accountData.json`)) {
-        fs.writeFileSync(`${__dirname}/../accountData.json`, "{}");
-        console.log("Account data file created.");
+    this.pageHtml = await Axios({
+      method: 'get',
+      url: 'https://x.com/home',
+      headers: {
+        'cookie': Object.entries(this.cookies).map(([key, value]) => `${key}=${value}`).join('; '),
       }
-      let storedData = fs.readFileSync(`${__dirname}/../accountData.json`, "utf-8")
-      if(storedData == "") storedData = "{}"
-      let parsedStoredData = JSON.parse(storedData);
-      
-      if(Object.keys(parsedStoredData?.cookies ?? parsedStoredData).length > 0) {
-        this.log("Found stored account data.");
-      } else {
-        this.log("No stored account data found.");
-        headless = false;
+    }).then(res => {
+      let headers = res.headers;
+      if(headers['set-cookie']) {
+        let setCookies = headers['set-cookie'];
+        if(typeof setCookies == 'string') setCookies = [setCookies];
+        setCookies.forEach((cookieStr) => {
+          let parts = cookieStr.split(';')[0].split('=');
+          let key = parts.shift()!.trim();
+          let value = parts.join('=').trim();
+          this.cookies[key] = value;
+        });
       }
-      
-      // Launch the browser and open a new blank page
-      const browser = await puppeteer.launch({
-        headless: headless,
-        ...puppeteerSettings
-      });
-
-      browser.on('disconnected', async () => {
-        if(!parsedStoredData?.cookies) {
-          await browser.close();
-          browser.process()?.kill()
-          throw new Error('Account data not found.')
-        }
-      });
-      
-      const page = await browser.newPage();
-      page.setDefaultNavigationTimeout(0)
-      // if stored data is an empty object
-      if (Object.keys(parsedStoredData?.cookies ?? parsedStoredData)?.length > 0)
-        await page.setCookie(...parsedStoredData.cookies);
-      else {
-        await page.setViewport({ width: 1080, height: 1024 });
-        console.log("Please login to the account you wish to automate.");
-      }
-
-      // Set screen size
-      if (!headless) await page.setViewport({ width: 1080, height: 1024 });
-
-      let gotCredentials = false;
-      let gotFeatureSwitches = false;
-
-      const checkDataFetched = async () => {
-        if (!(gotCredentials && gotFeatureSwitches)) return;
-        try {
-          if (!keepPageOpen && browser.connected) {
-            if(!page.isClosed()) await page.close()
-            await browser.close();
-          }
-
-        } catch (e) {
-          if (this.debug) console.error(e);
-        }
-        resolve();
-      }
-
-      page.on("request", async (request) => {
-        let headers = request.headers();
-        let guestToken = headers[`authorization`];
-        let csrftoken = headers[`x-csrf-token`];
-        if (guestToken && csrftoken) {
-          page.off("request");
-          page.off("response");
-          let cookies = await page.cookies();
-          let cookiesString = cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
-          parsedStoredData = {
-            Authorisation: guestToken,
-            "x-csrf-token": csrftoken,
-            cookies: cookies,
-            cookiesString: cookiesString,
-          };
-          fs.writeFileSync(`${__dirname}/../accountData.json`, JSON.stringify(parsedStoredData, null, 2));
-          this.token = guestToken;
-          this.csrfToken = csrftoken;
-          this.cookies = cookiesString;
-          gotCredentials = true;
-          checkDataFetched()
-        }
-      });
-      
-      let addedTrailingNewline = false;
-      if(this.debug) {
-        let totalBytesReceived = 0
-        const addAndWrite = (bytes: number) => {
-          if (gotCredentials) return addedTrailingNewline ? void 0 : process.stdout.write("\n"), addedTrailingNewline = true;
-          totalBytesReceived += bytes;
-          const formatted = totalBytesReceived > 1048576 
-            ? `${(totalBytesReceived / 1048576).toFixed(2)} MB` 
-            : `${(totalBytesReceived / 1024).toFixed(2)} KB`;
-          process.stdout.write(`\rTransfer: ${formatted}  `);
-        }
-        
-        page.on('response', async (response, header = response.headers()['content-length']) => 
-          addAndWrite(header ? parseInt(header, 10) : await response.buffer().catch(() => null).then((b) => b ? b.length : 0)));
-      }
-
-      // Navigate the page to a URL
-      await page.goto("https://twitter.com/home")
-      
-      // parse the html to match the window.__INITIAL_STATE__ declaration
-      this.pageHtml = await page.content();
-      const InitialStateObjectString = this.pageHtml.match(/window\.__INITIAL_STATE__=({.*?});/)?.[1] || '';
-      const __INITIAL_STATE__ = JSON.parse(InitialStateObjectString)
-      let featureSwitches = __INITIAL_STATE__?.["featureSwitch"]?.["user"] || {}
-
-      if(Object.keys(featureSwitches as Object).length === 0) console.warn("\n\x1b[33mWARNING: Failed to parse feature switches from DOM. All values will default to true.\x1b[0m"), addedTrailingNewline = true;
-      this.features = {
-        ...featureSwitches,
-        get: <T extends string[]>(keys: T): FeaturesGetData<T> => {
-          const entries = keys.map(key => [
-            key,
-            this.features.config?.[key]?.value ?? (this.debug && console.warn(`\x1b[33mWARNING: Feature Switch ${key} is missing. Defaulting to true.\x1b[0m`), true)
-          ]);
-          return {
-            ...Object.fromEntries(entries),
-            URIEncoded: function() {
-              return encodeURIComponent(JSON.stringify(this))
-            }
-          } as FeaturesGetData<T>;
-        }
-      }
-      gotFeatureSwitches = true;
-      checkDataFetched()
-
+      return res.data
     });
+    this.csrfToken = this.cookies['ct0'];
+    const mainJs = await Axios({
+      method: 'get',
+      url: this.pageHtml.match(/https:\/\/[^="]+?main.+?\.js/)?.[0] || ((() => { throw new Error('Failed to find main js url') })()),
+    }).then(res => res.data);
+    this.token = mainJs.match(/Bearer \w.+?(?=")/)?.[0] || '';
+    if(!this.token) throw new Error('Failed to fetch Bearer token')
+    
+    const InitialStateObjectString = this.pageHtml.match(/window\.__INITIAL_STATE__=({.*?});/)?.[1] || '';
+    const __INITIAL_STATE__ = JSON.parse(InitialStateObjectString)
+    let featureSwitches = __INITIAL_STATE__?.["featureSwitch"]?.["user"] || {}
+
+    if(Object.keys(featureSwitches as Object).length === 0) console.warn("\n\x1b[33mWARNING: Failed to parse feature switches from DOM. All values will default to true.\x1b[0m");
+    this.features = {
+      ...featureSwitches,
+      get: <T extends string[]>(keys: T): FeaturesGetData<T> => {
+        const entries = keys.map(key => [
+          key,
+          this.features.config?.[key]?.value ?? (this.debug && console.warn(`\x1b[33mWARNING: Feature Switch ${key} is missing. Defaulting to true.\x1b[0m`), true)
+        ]);
+        return {
+          ...Object.fromEntries(entries),
+          URIEncoded: function() {
+            return encodeURIComponent(JSON.stringify(this))
+          }
+        } as FeaturesGetData<T>;
+      }
+    };
   }
   /**
    * Search for tweets
