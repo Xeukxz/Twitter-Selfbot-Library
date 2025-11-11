@@ -4,7 +4,8 @@
   "description": "",
   "main": "dist/main.js",
   "scripts": {
-    "test": "tsx example/example.ts"
+    "example": "tsx example/example.ts",
+    "test": "tsx tests/test.ts"
   },
   "author": "Xeukxz",
   "license": "ISC",
