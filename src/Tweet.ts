@@ -165,12 +165,27 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
     }
 
     const cardValues = tweetData.card?.legacy?.binding_values
-    const videoCard = (cardValues as VideoCardBindingValues)?.find(v => v.key == 'unified_card' && v.value.string_value);
+
+    /**
+     * Card types:
+     * 
+     * video_website - ad cards with video
+     *   - Example: https://x.com/WarnerBrosUK/status/1489243421558542339
+     * 
+     * image_app - Some bullshit we dont care about but has similar structure to video_website
+     *   - Example: https://x.com/grok/status/1986160203465957650
+     * 
+     * ad cards with image
+     *   - Example: https://x.com/EW/status/1977042407381221485
+     */
+    
+    const unifiedCard = (cardValues as VideoCardBindingValues)?.find(v => v.key == 'unified_card' && v.value.string_value);
     const imageCard = (cardValues as ImageCardBindingValues)?.find(v => v.key == 'photo_image_full_size_large' && v.value.image_value);
-    if(videoCard) {
-      const cardData = JSON.parse(videoCard.value.string_value) as unifiedCardKeyData;
-      const mediaKey = cardData.component_objects.media_1.data.id;
-      this.media = [{
+    unifiedCheck: if(unifiedCard) {
+      const cardData = JSON.parse(unifiedCard.value.string_value) as unifiedCardKeyData;
+      if(cardData.type !== "video_website") break unifiedCheck;
+      const mediaKey = cardData.component_objects.media_1?.data.id;
+      if (mediaKey) this.media = [{
         type: "video",
         variants: cardData.media_entities[mediaKey].video_info.variants.filter(m => !m.url.includes("m3u8")).map((media) => {
           return {
@@ -179,6 +194,7 @@ export class Tweet<T extends TweetEntryTypes = TweetEntryTypes> {
           };
         })
       }]
+      
     } else if(imageCard) {
       this.media = [{
         type: "image",

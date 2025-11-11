@@ -1,4 +1,4 @@
-import { Client, TweetBasedTimeline, Tweet } from "../src";
+import { Client, TweetBasedTimeline, Tweet } from "..";
 
 const client = new Client({
   headless: true, // If the puppeteer browser should be visible or not.
@@ -34,12 +34,12 @@ async function streamTimelines() {
   //   id: '1632543657965363200',
   // });
   // streamList.push(list);
-  
+
   // // create tweet and get replies timeline
   // const tweet = await client.tweets.fetch('1825723913051000851');
   // const tweetReplies = await tweet.replies;
   // streamList.push(tweetReplies);
-  
+
   // create posts timeline without a profile
   const elonPosts = await client.timelines.fetch({
     type: 'posts',
@@ -100,8 +100,9 @@ function streamAll(timelines: TweetBasedTimeline[]) {
   timelines.forEach((timeline) => { // stream each timeline and log new tweets
     // manage new tweets
     timeline.on('timelineUpdate', async (tweets: Tweet[]) => {
+      console.log(`Timeline Update [${timeline.type}]:`, tweets.length, 'new tweets');
       console.log("--------------- NEW TWEETS --------------");
-      console.log(tweets.map(t => `${t.createdAt} - ${t.isRetweet ? t.retweetedTweet?.text : t.text}`).join("\n"));
+      console.log(tweets.map(t => `${t.createdAt} - ${t.isRetweet ? t.retweetedTweet?.text : t.text}`.replace(/\n/g, '\\n')).join("\n"));
       console.log("------------------------------------------");
       console.log(`${client.timelines.cache.reduce((acc, timeline) => acc + timeline.tweets.cache.length, 0)} total tweets cached`);
     });
