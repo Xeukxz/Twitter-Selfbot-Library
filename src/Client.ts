@@ -89,9 +89,9 @@ export class Client extends EventEmitter<ClientEvents> {
     }
     
     this.log("fetching auth token from env variable...");
-    const envToken = process.env.authToken;
+    const envToken = process.env.auth_token;
     if(envToken) this.cookies.auth_token = envToken;
-    else throw new Error('No stored account data found. Please add an `authToken` entry to your .env file');
+    else throw new Error('No stored account data found. Please add an `auth_token` entry to your .env file');
 
     this.pageHtml = await Axios({
       method: 'get',
