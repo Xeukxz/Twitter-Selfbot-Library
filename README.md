@@ -6,7 +6,7 @@
 1. Clone the repository
 2. Run `npm install` to install dependencies
 3. Add your Twitter auth_token cookie to a `.env` file your project's root directory (`auth_token=...`)
-   - To do get your auth_token cookie, log into Twitter, open devtools, and paste `document.cookie.match(/auth_token=\w+/)[0]` into the console, then copy the result into your `.env` file
+   - To get your auth_token cookie, log into Twitter, open devtools, and paste `document.cookie.match(/auth_token=\w+/)[0]` into the console, then copy the result into your `.env` file
 4. Import `{ Client }` from the root directory
 
 > [!NOTE]
