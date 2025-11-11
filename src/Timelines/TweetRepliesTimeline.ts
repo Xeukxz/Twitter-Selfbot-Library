@@ -1,4 +1,4 @@
-import { BaseTweetBasedTimeline, RawTimelineResponseData, TimelineTerminateTimeline } from "./BaseTweetBasedTimeline";
+import { BaseTweetBasedTimeline, BottomCursorData, RawTimelineResponseData, TimelineAddEntries, TimelineTerminateTimeline } from "./BaseTweetBasedTimeline";
 import { RawConversationThreadEntryData, RawTweetEntryData, Tweet, TweetEntryTypes } from '../Tweet';
 import { Client } from "../Client";
 import fs from 'fs';
@@ -7,7 +7,9 @@ export interface tweetRepliesTimelineData {
   tweetId: string;
 }
 
-export class TweetRepliesTimeline extends BaseTweetBasedTimeline<RawConversationThreadEntryData | RawTweetEntryData> {
+type EntriesItem = RawConversationThreadEntryData | RawTweetEntryData
+
+export class TweetRepliesTimeline extends BaseTweetBasedTimeline<EntriesItem> {
   cache: RawTweetRepliesTimelineResponseData[] = [];
   tweet?: Tweet<RawTweetEntryData>;
   variables = {
@@ -40,19 +42,13 @@ export class TweetRepliesTimeline extends BaseTweetBasedTimeline<RawConversation
   }
 
   async fetchLatest() {
-    return await this.scroll();
+    return await this.fetchLater();
   }
 
-  async scroll() {
-    this.variables.cursor = this.cursors.bottom;
-    let { tweets, rawData } = await this.fetch();
-    let entries = ((rawData as RawTweetRepliesTimelineResponseData).data.threaded_conversation_with_injections_v2.instructions.find(i => i.type == "TimelineAddEntries") as RawTweetRepliesTimelineAddEntries)!.entries;
-    this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as TweetRepliesBottomCursorData).content.itemContent.value;
+  async fetchLater() {
+    const returnData = await super.fetchLater();
     this.variables.referrer = "tweet"; // should be set after the first fetch
-    return {
-      tweets,
-      rawData: this.cache[this.cache.length - 1]
-    };
+    return returnData;
   }
 
   buildTweets(data: RawTweetRepliesTimelineResponseData) {
@@ -63,7 +59,7 @@ export class TweetRepliesTimeline extends BaseTweetBasedTimeline<RawConversation
           JSON.stringify(data, null, 2)
         );
       let instructions = data.data.threaded_conversation_with_injections_v2.instructions;
-      let entries = (instructions.find(i => i.type == "TimelineAddEntries") as RawTweetRepliesTimelineAddEntries)!.entries;
+      let entries = (instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<EntriesItem>)!.entries;
       let tweets = entries.filter(e => e.entryId.startsWith("tweet-")) as RawTweetEntryData[];
       let replies = entries.filter(e => e.entryId.startsWith("conversationthread-")) as RawConversationThreadEntryData[];
 
@@ -79,13 +75,8 @@ export class TweetRepliesTimeline extends BaseTweetBasedTimeline<RawConversation
     });
   }
 
-  setCursors(rawTimelineData: RawTimelineResponseData): void {
-    let instructions = (rawTimelineData as RawTweetRepliesTimelineResponseData).data.threaded_conversation_with_injections_v2.instructions;
-    let entries = (instructions.find(i => i.type == "TimelineAddEntries") as RawTweetRepliesTimelineAddEntries)!.entries;
-    // console.log(entries)
-    let cursor = (entries.find(e => (e as TweetRepliesBottomCursorData).entryId?.startsWith("cursor-bottom")) as TweetRepliesBottomCursorData) || (entries.find(e => (e as TweetRepliesBottomCursorData).entryId?.startsWith("cursor-showmorethreads-")) as TweetRepliesBottomCursorData);
-    if(!cursor) console.trace(`No bottom cursor found in tweet replies timeline`, entries);
-    this.cursors.bottom = (cursor.content.itemContent)?.value || (cursor.content as any).value;
+  getEntriesFromData(rawTimelineData: RawTimelineResponseData): TimelineAddEntries<EntriesItem> {
+    return (rawTimelineData as RawTweetRepliesTimelineResponseData).data.threaded_conversation_with_injections_v2.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<EntriesItem>;
   }
 }
 
@@ -93,33 +84,9 @@ export interface RawTweetRepliesTimelineResponseData {
   data: {
     threaded_conversation_with_injections_v2: {
       instructions: [
-        RawTweetRepliesTimelineAddEntries,
+        TimelineAddEntries<EntriesItem>,
         TimelineTerminateTimeline
       ]
-    }
-  }
-}
-
-export interface RawTweetRepliesTimelineAddEntries {
-  type: "TimelineAddEntries",
-  entries: [
-    ...([RawTweetEntryData] | [RawTweetEntryData, RawTweetEntryData]) | [],
-    ...RawConversationThreadEntryData[],
-    TweetRepliesBottomCursorData
-  ]
-}
-
-export interface TweetRepliesBottomCursorData {
-  entryId: string,
-  sortIndex: string,
-  content: {
-    entryType: string,
-    __typename: string,
-    itemContent: {
-      itemType: "TimelineTimelineCursor",
-      __typename: "TimelineTimelineCursor",
-      value: string,
-      cursorType: "Bottom",
     }
   }
 }

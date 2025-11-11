@@ -72,16 +72,7 @@ export class NotificationsTimeline extends BaseTimeline<RawNotificationEntryData
     this.variables.cursor = this.cursors.top;
     this.variables.count = 40;
     let { notifications, rawData } = await this.fetch();
-    let entries = (
-      (
-        rawData as RawNotificationsTimelineResponseData
-      ).data.viewer_v2.user_results.result.notification_timeline.timeline.instructions.find(
-        (i) => i.type == 'TimelineAddEntries'
-      ) as TimelineAddEntries<RawNotificationEntryData>
-    ).entries;
-    this.cursors.top = (
-      entries.find((e) => e.entryId.startsWith('cursor-top')) as TopCursorData
-    ).content.value;
+    this.setCursors(rawData);
     this.resetVariables();
     if(notifications.length > 0) this.client.rest.post(`https://x.com/i/api/2/notifications/${this.category.toLowerCase()}/last_seen_cursor.json`, {
       cursor: this.cursors.top
@@ -94,22 +85,14 @@ export class NotificationsTimeline extends BaseTimeline<RawNotificationEntryData
     };
   }
 
-  async scroll() {
+  async fetchLater() {
     this.variables.cursor = this.cursors.bottom;
     this.variables.count = 40;
     let { notifications, rawData } = await this.fetch();
-    let entries = (
-      (
-        rawData as RawNotificationsTimelineResponseData
-      ).data.viewer_v2.user_results.result.notification_timeline.timeline.instructions.find(
-        (i) => i.type == 'TimelineAddEntries'
-      ) as TimelineAddEntries<RawNotificationEntryData>
-    ).entries;
-    let newCursor = (
-      entries.find((e) =>
-        e.entryId.startsWith('cursor-bottom')
-      ) as BottomCursorData
-    )?.content.value;
+    let entries = this.getEntriesFromData(rawData).entries;
+    const cursor = this.extractCursorEntries(entries, 'bottom');
+    if (!cursor) return false;
+    const newCursor = this.extractCursorValue(cursor);
     if (!newCursor) return false;
     this.cursors.bottom = newCursor;
     this.resetVariables();
@@ -160,20 +143,8 @@ export class NotificationsTimeline extends BaseTimeline<RawNotificationEntryData
     });
   }
 
-  setCursors(rawTimelineData: RawNotificationsTimelineResponseData): void {
-    let entries = (
-      rawTimelineData.data.viewer_v2.user_results.result.notification_timeline.timeline.instructions.find(
-        (i) => i.type == 'TimelineAddEntries'
-      ) as TimelineAddEntries<RawNotificationEntryData>
-    ).entries;
-    const top = entries.find((e) =>
-      e.entryId.startsWith('cursor-top')
-    ) as TopCursorData;
-    this.cursors.top = top.content.value;
-    const bottom = entries.find((e) =>
-      e.entryId.startsWith('cursor-bottom')
-    ) as BottomCursorData;
-    if(bottom) this.cursors.bottom = bottom.content.value;
+  getEntriesFromData(rawTimelineData: RawTimelineResponseData): TimelineAddEntries<RawNotificationEntryData<RawNotificationEntryDataType>> {
+    return (rawTimelineData as RawNotificationsTimelineResponseData).data.viewer_v2.user_results.result.notification_timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawNotificationEntryData>;
   }
 
   /**
@@ -213,7 +184,7 @@ export class NotificationsTimeline extends BaseTimeline<RawNotificationEntryData
 
     while(!foundLastHandledNotif) {
       await new Promise(res => setTimeout(res, 1000)); // wait 1 second between requests
-      let laterNotifications = await this.scroll();
+      let laterNotifications = await this.fetchLater();
       if(!laterNotifications || laterNotifications.notifications.length === 0) break; // no more notifications
       for(let notif of laterNotifications.notifications) {
         if(notif.sortIndex > lastSortIndex) newNotifications.push(notif);
@@ -244,7 +215,7 @@ export class NotificationsTimeline extends BaseTimeline<RawNotificationEntryData
 
     while(n > 0) {
       await new Promise(res => setTimeout(res, 1000)); // wait 1 second between requests
-      const laterNotifications = await this.scroll();
+      const laterNotifications = await this.fetchLater();
       if(!laterNotifications || laterNotifications.notifications.length === 0) break; // no more notifications
       for(let notif of laterNotifications.notifications) 
         if(n > 0) newNotifications.push(notif), n--;

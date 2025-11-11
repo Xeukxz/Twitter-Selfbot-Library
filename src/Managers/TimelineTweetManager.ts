@@ -1,6 +1,6 @@
 import { Client } from "../Client";
-import { RawTweetRepliesTimelineAddEntries, RawTweetRepliesTimelineResponseData } from "../Timelines/TweetRepliesTimeline";
-import { RawTweetEntryData, Tweet, TweetEntryTypes } from "../Tweet";
+import { TimelineEntryData } from '../Timelines';
+import { Tweet, TweetEntryTypes, TweetCardData } from '../Tweet';
 
 export class TimelineTweetManager<TweetData extends TweetEntryTypes>  {
   client: Client
@@ -27,19 +27,14 @@ export class TimelineTweetManager<TweetData extends TweetEntryTypes>  {
     return this.cache.find((tweet) => tweet.id === id);
   }
 
-  addTweets(tweets: TweetData[]) {
+  addTweets(tweets: TimelineEntryData<TweetData> | TweetData[]) {
     const validEntryNames = ['tweet-', 'profile-grid-', 'profile-conversation-', 'conversationthread-'];
-    console.log(`${tweets.filter(tweet => !validEntryNames.some(str => tweet.entryId.startsWith(str))).map(tweet => `Skipping ${tweet.entryId}`).join('\n')}`)
-    tweets = tweets.filter(tweet => validEntryNames.some(str => tweet.entryId.startsWith(str)));
-    let newTweets = tweets.filter(tweet => !this.cache.some(cachedTweet => {
+    this.client.log(`${tweets.filter(tweet => !validEntryNames.some(str => tweet.entryId.startsWith(str))).map(tweet => `Skipping ${tweet.entryId}`).join('\n')}`)
+    const tweetData = tweets.filter(tweet => validEntryNames.some(str => tweet.entryId.startsWith(str))) as TweetData[];
+    let newTweets = tweetData.filter(tweet => !this.cache.some(cachedTweet => {
       return cachedTweet.id == Tweet.ParseEntryToData(tweet)?.rest_id
-    })
-      
-    )
-    .map(tweet => new Tweet<TweetData>(this.client, tweet))
-    console.log(`Adding ${newTweets.length} new tweets`)
+    })).map(tweet => new Tweet<TweetData>(this.client, tweet))
     this.cache = this.cache.concat(newTweets).filter((tweet) => !tweet.unavailable);
-    console.log(`Total tweets: ${this.cache.length}`)
     return newTweets;
   }
 

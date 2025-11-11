@@ -7,6 +7,7 @@ import {
   TimelineAddEntries,
   TimelineReplaceEntry,
   TopCursorData,
+  RawTimelineResponseData,
 } from "./BaseTweetBasedTimeline";
 import fs from "fs";
 
@@ -44,64 +45,38 @@ export class SearchTimeline extends BaseTweetBasedTimeline<RawTweetEntryData> {
     this.variables.product = data.product as SearchTimelineUrlData["variables"]["product"] ?? "Latest";
   }
 
-  async fetchLatest() {
-    this.variables.cursor = this.cursors.top;
-    this.variables.count = 40;
-    let { tweets, rawData } = await this.fetch();
-    let entries = ((rawData as RawSearchTimelineResponseData).data.search_by_raw_query.search_timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>)!.entries;
-    this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
-    this.resetVariables();
-    return {
-      tweets,
-      rawData: this.cache[this.cache.length - 1]
-    };
-  }
-
-  async scroll() {
-    this.variables.cursor = this.cursors.bottom;
-    this.variables.count = 40;
-    let { tweets, rawData } = await this.fetch();
-    let entries = ((rawData as RawSearchTimelineResponseData).data.search_by_raw_query.search_timeline.timeline.instructions.filter(i => i.type == "TimelineReplaceEntry") as TimelineReplaceEntry[]);
-    this.cursors.bottom = (entries.find(e => e.entry.entryId.startsWith("cursor-bottom"))!.entry as BottomCursorData).content.value;
-    this.resetVariables();
-    return {
-      tweets,
-      rawData: this.cache[this.cache.length - 1]
-    };
-  }
-
-  buildTweets(data: RawSearchTimelineResponseData) {
-    return new Promise<Tweet<RawTweetEntryData>[]>((resolve, reject) => {
-      if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-search.json`, JSON.stringify(data, null, 2));
-      let tweets = this.tweets.addTweets(
-        (data.data.search_by_raw_query.search_timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>)!.entries as RawTweetEntryData[]
-      ) as Tweet<RawTweetEntryData>[];
-      resolve(tweets);
-    });
-  }
-
   setCursors(rawTimelineData: RawSearchTimelineResponseData): void {
     let instructions = (rawTimelineData.data.search_by_raw_query.search_timeline.timeline.instructions);
     let entries = (instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>)!.entries;
     let topCursor = entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData;
     let bottomCursor = entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData;
 
-    if (topCursor) this.cursors.top = topCursor?.content.value;
-    if (bottomCursor) this.cursors.bottom = bottomCursor?.content.value;
+    if (topCursor) this.cursors.top = this.extractCursorValue(topCursor)!;
+    if (bottomCursor) this.cursors.bottom = this.extractCursorValue(bottomCursor)!;
 
     let replaceEntries = instructions.filter(e => e.type == "TimelineReplaceEntry") as TimelineReplaceEntry[];
+    // this.cursors.top = this.extractCursorValue(this.extractCursorEntries(replaceEntries, 'top') ?? undefined) || this.cursors.top;
+    // this.cursors.bottom = this.extractCursorValue(this.extractCursorEntries(replaceEntries, 'bottom') ?? undefined) || this.cursors.bottom;
     replaceEntries.forEach(e => {
       if (e.entry.entryId.startsWith("cursor")) {
-        let cursor = e.entry as TopCursorData | BottomCursorData;
-        if (cursor) {
-          if (cursor.content.cursorType == "Top") {
-            this.cursors.top = cursor.content.value;
-          } else if (cursor.content.cursorType == "Bottom") {
-            this.cursors.bottom = cursor.content.value;
-          }
-        }
+        const data = this.extractCursorContentData(e.entry);
+        if(data?.cursorType == "Top") this.cursors.top = data?.value;
+        else if(data?.cursorType == "Bottom") this.cursors.bottom = data?.value;
+        // let cursor = e.entry as TopCursorData | BottomCursorData;
+        // if (cursor) {
+        //   const content = this.extractCursorContentData(cursor);
+        //   if (content?.cursorType == "Top") {
+        //     this.cursors.top = content?.value;
+        //   } else if (content?.cursorType == "Bottom") {
+        //     this.cursors.bottom = content?.value;
+        //   }
+        // }
       }
     })
+  }
+
+  getEntriesFromData(rawTimelineData: RawTimelineResponseData): TimelineAddEntries<RawTweetEntryData> {
+    return (rawTimelineData as RawSearchTimelineResponseData).data.search_by_raw_query.search_timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawTweetEntryData>;
   }
 }
 

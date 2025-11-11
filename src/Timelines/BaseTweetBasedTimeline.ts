@@ -13,6 +13,7 @@ import { RawTweetRepliesTimelineResponseData, TweetRepliesTimeline } from "./Twe
 import { RawSearchTimelineResponseData, SearchTimeline, SearchTimelineData } from "./SearchTimeline";
 import { NotificationsTimeline, RawNotificationsTimelineResponseData } from './NotificationTimeline';
 import { BaseTimeline } from './BaseTimeline';
+import fs from 'fs';
 
 export type TimelineData = HomeTimelineData | FollowingTimelineData | ListTimelineData | PostsTimelineData | MediaTimelineData | RepliesTimelineData | SearchTimelineData
 
@@ -71,7 +72,14 @@ export abstract class BaseTweetBasedTimeline<T extends TweetEntryTypes> extends 
     })
   }
 
-  abstract buildTweets(data: any): Promise<Tweet<T>[]>
+
+  buildTweets(data: RawTimelineResponseData) {
+    return new Promise<Tweet<T>[]>((resolve, reject) => {
+      if(this.client.debug) fs.writeFileSync(`${__dirname}/../../debug/debug-${this.type}.json`, JSON.stringify(data, null, 2));
+      let tweets = this.tweets.addTweets(this.getEntriesFromData(data)!.entries) as Tweet<T>[];
+      resolve(tweets);
+    });
+  }
 
   /**
    * Streams the timeline data with variable intervals.
@@ -221,7 +229,7 @@ export abstract class BaseTweetBasedTimeline<T extends TweetEntryTypes> extends 
   }, handleTweets: (tweets: TimelineTweetReturnData) => void, onCatchUpComplete: () => void) {
     if (minCatchUpTimeout > maxCatchUpTimeout) maxCatchUpTimeout = minCatchUpTimeout
     let randomTime = minCatchUpTimeout + Math.floor(Math.random() * (maxCatchUpTimeout - minCatchUpTimeout))
-    await this.scroll().then(newTweets => {
+    await this.fetchLater().then(newTweets => {
       if(!newTweets) {
         console.log(`No more tweets to fetch, stopping catch up // ${this.type}`)
         return onCatchUpComplete()
@@ -249,6 +257,27 @@ export abstract class BaseTweetBasedTimeline<T extends TweetEntryTypes> extends 
     })
     
   }
+
+  private async fetchNext(cursor: 'top' | 'bottom') {
+    this.variables.cursor = this.cursors[cursor];
+    this.variables.count = 40;
+    let { tweets, rawData } = await this.fetch();
+    this.setCursors(rawData, cursor);
+    this.resetVariables();
+    return {
+      tweets,
+      rawData: this.cache[this.cache.length - 1]
+    };
+  }
+
+  async fetchLatest() {
+    return await this.fetchNext('top')
+  } 
+
+  async fetchLater() {
+    return await this.fetchNext('bottom')
+  }
+
 
   /**
    * Stops the timeline stream
@@ -284,30 +313,42 @@ export type Timeline = TweetBasedTimeline | NotificationBasedTimeline
 
 export type TimelineEntryData<T> = [...T[], Cursor, Cursor]
 
-export interface CursorData {
-  entryId: `cursor-${"top" | "bottom"}-${number}`,
+export interface BaseCursorData<T extends 'Top' | 'Bottom' = 'Top' | 'Bottom'> {
+  /**
+   * `entryId` can be: 
+   * - `cursor-top-${number}` 
+   * - `cursor-bottom-${number}` 
+   * - `cursor-showmorethreads-${number}` (alias for bottom cursor in some timelines)
+   */
+  entryId: `cursor-${T extends 'Top' ? 'top' : ('bottom' | 'showmorethreads')}-${number}`,
   sortIndex: string,
   content: {
     entryType: string,
     __typename: string,
-    value: string,
-    cursorType: "Top" | "Bottom"
   }
 }
 
-export interface TopCursorData extends CursorData {
-  entryId: `cursor-top-${number}`,
-  content: CursorData["content"] & {
-    cursorType: "Top"
+export interface CursorItemData<T extends 'Top' | 'Bottom' = 'Top' | 'Bottom'> extends BaseCursorData<T> {
+  content: BaseCursorData['content'] & {
+    itemContent: {
+      itemType: "TimelineTimelineCursor",
+      __typename: "TimelineTimelineCursor",
+      value: string,
+      cursorType: T
+    }
   }
 }
 
-export interface BottomCursorData extends CursorData {
-  entryId: `cursor-bottom-${number}`,
-  content: CursorData["content"] & {
-    cursorType: "Bottom"
+export interface CursorData<T extends 'Top' | 'Bottom' = 'Top' | 'Bottom'> extends BaseCursorData<T> {
+  content: BaseCursorData['content'] & {
+    value: string
+    cursorType: T
   }
 }
+
+export type TopCursorData = (CursorData<'Top'> | CursorItemData<'Top'>)
+
+export type BottomCursorData = (CursorData<'Bottom'> | CursorItemData<'Bottom'>)
 
 export type Cursor = TopCursorData | BottomCursorData
 

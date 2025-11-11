@@ -42,34 +42,6 @@ export class MediaTimeline extends BaseTweetBasedTimeline<RawGridEntryData> {
     this.profileUsername = data.username;
   }
 
-  async fetchLatest() {
-    this.variables.cursor = this.cursors.top
-    this.variables.count = 40;
-    let { tweets, rawData } = await this.fetch()
-    let instructions = (rawData as RawMediaAddToModuleTimelineResponseData).data.user.result.timeline.timeline.instructions;
-    let entries = (instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawGridEntryData>)!.entries;
-    this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
-    this.resetVariables()
-    return {
-      tweets,
-      rawData
-    };
-  }
-
-  async scroll() {
-    this.variables.cursor = this.cursors.bottom
-    this.variables.count = 40;
-    let { tweets, rawData } = await this.fetch()
-    let instructions = (rawData as RawMediaAddToModuleTimelineResponseData).data.user.result.timeline.timeline.instructions;
-    let entries = (instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawGridEntryData>)!.entries;
-    this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
-    this.resetVariables()
-    return {
-      tweets,
-      rawData
-    };
-  }
-
   fetch() {
     return new Promise<{
       tweets: Tweet<TweetEntryTypes>[];
@@ -113,18 +85,15 @@ export class MediaTimeline extends BaseTweetBasedTimeline<RawGridEntryData> {
 
         if (!firstFetch) return reject("Failed to fetch initial timeline");
 
-        const cursorEntries =
-          (firstFetch.data.user.result.timeline.timeline.instructions.find(
-            (i) => i.type == "TimelineAddEntries"
-          ) as MediaModuleTimelineAddEntries)!.entries.filter(
-            (e) => e.content.entryType == "TimelineTimelineCursor"
-          ) as Cursor[];
-        this.cursors.top = cursorEntries.find(
-          (e) => e.content.cursorType == "Top"
-        )!.content.value;
-        this.cursors.bottom = cursorEntries.find(
-          (e) => e.content.cursorType == "Bottom"
-        )!.content.value;
+        this.setCursors(firstFetch);
+
+      //   const cursorEntries =this.getEntriesFromData(firstFetch).entries.filter((e) => e.entryId.match(/^cursor/)) as Cursor[];
+      //   this.cursors.top = cursorEntries.find(
+      //     (e) => e.content.cursorType == "Top"
+      //   )!.content.value;
+      //   this.cursors.bottom = cursorEntries.find(
+      //     (e) => e.content.cursorType == "Bottom"
+      //   )!.content.value;
         this.variables.cursor = this.cursors.bottom;
       }
 
@@ -170,10 +139,8 @@ export class MediaTimeline extends BaseTweetBasedTimeline<RawGridEntryData> {
     });
   }
 
-  setCursors(rawTimelineData: RawMediaAddToModuleTimelineResponseData | RawMediaModuleTimelineResponseData): void {
-    let entries = (rawTimelineData.data.user.result.timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawGridEntryData>)!.entries;
-    this.cursors.top = (entries.find(e => e.entryId.startsWith("cursor-top")) as TopCursorData).content.value;
-    this.cursors.bottom = (entries.find(e => e.entryId.startsWith("cursor-bottom")) as BottomCursorData).content.value;
+  getEntriesFromData(rawTimelineData: RawTimelineResponseData): TimelineAddEntries<RawGridEntryData> {
+    return (rawTimelineData as RawMediaAddToModuleTimelineResponseData).data.user.result.timeline.timeline.instructions.find(i => i.type == "TimelineAddEntries") as TimelineAddEntries<RawGridEntryData>;
   }
 }
 
