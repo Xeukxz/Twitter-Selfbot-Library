@@ -13,7 +13,7 @@ import { ClientTransaction, handleXMigration } from 'x-client-transaction-id';
 import { config } from 'dotenv';
 import Axios from 'axios';
 
-config();
+config({ quiet: true });
 
 export interface ClientParams {
   debug?: boolean;
