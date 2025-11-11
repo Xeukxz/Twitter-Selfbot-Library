@@ -38,7 +38,7 @@ export class RESTApiManager {
       return `\n\x1b[1m[TRACE]\x1b[0m\n`
            + `Time: \x1b[90m${this._trace.time > 0 ? new Date(this._trace.time).toLocaleString() + `${this._trace.time}` : 'undefined'}\x1b[0m\n`
            + `Status: \x1b[90m${this._trace.status}\x1b[0m\n`
-           + `curl: \x1b[90mcurl -X GET "${this._trace.url}" ${Object.entries(this.headers).map(([key, value]) => `-H "${key}: ${value}"`).join(' ')}\x1b[0m\n`
+           + `curl: \x1b[90mcurl -X GET "${this._trace.url}" ${Object.entries(this.headers).map(([key, value]) => `-H "${key}: ${value}"`).join(' ')} --compressed\x1b[0m\n`
            + `Headers: \x1b[90m${JSON.stringify(this.headers, null, 2)}\x1b[0m\n`
     }
   };
@@ -123,6 +123,11 @@ export class RESTApiManager {
             fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-error-${this.errorCount}.json`, JSON.stringify(res.data, null, 2));
             fs.writeFileSync(`${__dirname}/../../debug/debug-graphql-full-${this.errorCount}.txt`, inspect(res, {depth: 10}));
             console.error(`Error written to debug-error-graphql-${this.errorCount++}.json`);
+          }
+          if(res.data.data) {
+            if(this.client.debug) console.warn(`GraphQL Warning: Received errors alongside data: ${(res.data.errors as Array<any>).map(e => e.message).join(' // ')}`);
+            resolve(res);
+            return;
           }
           if(res.data.errors[0].retry_after !== undefined) {
             if(this.client.debug) console.error(`Retrying after ${res.data.errors[0].retry_after}ms`);
